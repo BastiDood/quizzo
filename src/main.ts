@@ -35,8 +35,6 @@ Discord.startBot({
                 case 1:
                     await COMMANDS.getCommand(cmd)?.execute(message, args);
                     break;
-                default:
-                    console.log('Hello');
             }
         },
         ready() { console.log('Bot is online!'); },
