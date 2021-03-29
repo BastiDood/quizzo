@@ -7,6 +7,7 @@ Discord.startBot({
     token: BOT_TOKEN,
     compress: true,
     intents: [
+        'GUILDS',
         'DIRECT_MESSAGES',
         'DIRECT_MESSAGE_REACTIONS',
         'GUILD_MESSAGES',
