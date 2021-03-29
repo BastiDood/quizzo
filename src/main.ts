@@ -1,5 +1,5 @@
 import { Discord, Dotenv } from 'deps';
-import { COMMANDS } from './commands/mod.ts';
+import { getCommand } from './commands/mod.ts';
 
 const { BOT_TOKEN } = Dotenv.config({ export: false, safe: true });
 
@@ -21,7 +21,7 @@ Discord.startBot({
                 .replaceAll(/\s+/g, ' ')
                 .split(' ');
 
-            await COMMANDS.getCommand(cmd)?.execute(message, args);
+            await getCommand(cmd)?.execute(message, args);
         },
         ready() { console.log('Bot is online!'); },
     },

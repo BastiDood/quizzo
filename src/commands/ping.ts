@@ -3,9 +3,9 @@ import type { Command } from './mod.ts';
 export const ping: Command = {
     help: {
         description: 'Pong!',
-        usage: '%pong',
+        usage: '%ping',
     },
-    async execute(msg, _) {
+    async execute(msg, _args) {
         await msg.reply('Pong!');
     },
 };
