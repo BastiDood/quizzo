@@ -1,4 +1,5 @@
 import { Discord } from 'deps';
+import { create } from './create.ts';
 import { ping } from './ping.ts';
 
 export interface Command {
@@ -9,8 +10,10 @@ export interface Command {
     execute(msg: Discord.Message, args: string[]): Promise<void>;
 }
 
+/** Command registry. */
 const commands = new Map<string, Command>([
-    [ 'ping', ping ]
+    [ 'ping', ping ],
+    [ 'create', create ],
 ]);
 
 /** Queries for the given command name. */

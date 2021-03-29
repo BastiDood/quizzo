@@ -3,10 +3,11 @@ interface Question {
     choices: string[];
 }
 
+/** Quiz registry. */
 const quizzes = new Map<string, Question>();
 
 /** Sets the current quiz of the given user. */
-export function addQuestion(userID: string, description: string, choices: string[]) {
+export function setQuestion(userID: string, description: string, choices: string[]) {
     quizzes.set(userID, { description, choices });
 }
 

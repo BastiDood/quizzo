@@ -5,7 +5,7 @@ export const ping: Command = {
         description: 'Pong!',
         usage: '%ping',
     },
-    async execute(msg, _args) {
+    async execute(msg, _) {
         await msg.reply('Pong!');
     },
 };
