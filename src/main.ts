@@ -1,5 +1,5 @@
 import { Discord, Dotenv } from 'deps';
-import { _receiveReaction, _removeReaction } from './collector.ts';
+import { _clearAll, _clearAllByName, _receiveReaction, _removeReaction } from './collector.ts';
 import { getCommand } from './commands/mod.ts';
 
 const { BOT_TOKEN } = Dotenv.config({ export: false, safe: true });
@@ -26,8 +26,11 @@ Discord.startBot({
         },
         reactionAdd(payload) { _receiveReaction(payload); },
         reactionRemove(payload, _, userID) { _removeReaction(payload, userID); },
-        // TODO: reactionRemoveAll
-        // TODO: reactionRemoveEmoji
+        reactionRemoveAll(data) { _clearAll(data.message_id); },
+        reactionRemoveEmoji({ emoji }) {
+            if (emoji.name)
+                _clearAllByName(emoji.name);
+        },
         ready() { console.log('Bot is online!'); },
     },
 });

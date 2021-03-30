@@ -58,3 +58,16 @@ export function _removeReaction({ id, emoji, member }: Discord.MessageReactionUn
     if (reactions.size < 1)
         msg.delete(userID);
 }
+
+export function _clearAll(id: string) {
+    messages.delete(id);
+}
+
+export function _clearAllByName(name: string) {
+    for (const reactions of messages.values())
+        for (const [ userID, reax ] of reactions) {
+            reax.delete(name);
+            if (reax.size < 1)
+                reactions.delete(userID);
+        }
+}
