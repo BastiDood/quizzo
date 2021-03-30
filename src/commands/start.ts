@@ -21,6 +21,7 @@ export const start: Command = {
         }));
         const quiz = await msg.send({
             embed: {
+                color: 0x236EA5,
                 author: {
                     name: msg.author.username,
                     icon_url: msg.member?.avatarURL,
@@ -44,7 +45,7 @@ export const start: Command = {
         }
 
         // Send results of the quiz
-        await msg.send(`The correct answer is ${fields[question.answer].name}.`);
+        await msg.send(`**Time's up! The correct answer is ${fields[question.answer].name}.**`);
         // TODO: Compute total reactions and correct answers for the leaderboard feature
     },
 };
