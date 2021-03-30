@@ -1,5 +1,5 @@
 import { Discord, Dotenv } from 'deps';
-import { _receiveReaction } from './collector.ts';
+import { _receiveReaction, _removeReaction } from './collector.ts';
 import { getCommand } from './commands/mod.ts';
 
 const { BOT_TOKEN } = Dotenv.config({ export: false, safe: true });
@@ -24,7 +24,10 @@ Discord.startBot({
 
             await getCommand(cmd)?.execute(message, args);
         },
-        reactionAdd(payload, _emoji, _msg) { _receiveReaction(payload); },
+        reactionAdd(payload) { _receiveReaction(payload); },
+        reactionRemove(payload, _, userID) { _removeReaction(payload, userID); },
+        // TODO: reactionRemoveAll
+        // TODO: reactionRemoveEmoji
         ready() { console.log('Bot is online!'); },
     },
 });

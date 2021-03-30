@@ -39,3 +39,22 @@ export function _receiveReaction({ id, user_id, emoji, member }: Discord.Message
     else
         msg.set(user_id, new Set([ emoji.name ]));
 }
+
+export function _removeReaction({ id, emoji, member }: Discord.MessageReactionUncachedPayload, userID: string) {
+    if (emoji.name === null || member?.user.bot || member?.user.system)
+        return;
+
+    const msg = messages.get(id);
+    if (msg === undefined)
+        return;
+
+    const reactions = msg.get(userID);
+    if (reactions === undefined)
+        return;
+
+    // Also remove user from accumulation
+    // if they have no reactions left
+    reactions.delete(emoji.name);
+    if (reactions.size < 1)
+        msg.delete(userID);
+}
