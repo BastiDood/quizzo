@@ -1,6 +1,7 @@
 {
     "imports": {
         "deps": "./deps.ts",
-        "state": "./src/state.ts"
+        "state": "./src/state.ts",
+        "collector": "./src/collector.ts"
     }
 }

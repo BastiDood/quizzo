@@ -1,16 +1,49 @@
-import { Discord, Std } from 'deps';
-import { incrementWinCount, popQuestion } from 'state';
+import { beginCollectingFor, finishCollectingFor } from 'collector';
+import { Discord, Std, Zod } from 'deps';
+import { Question, incrementWinCount } from 'state';
 import type { Command } from './mod.ts';
+
+const QuestionSchema = Zod.object({
+    description: Zod.string(),
+    choices: Zod.string().array(),
+    answer: Zod.number(),
+    limit: Zod.number(),
+});
+const URLChecker = Zod.string().url();
 
 export const start: Command = {
     help: {
-        description: 'Start the current user\'s hosted quiz, if any.',
-        usage: '%start',
+        description: 'Start a quiz based on the JSON information from a URL.',
+        usage: '%start <url>',
     },
-    async execute(msg, _) {
-        const question = popQuestion(msg.author.id);
-        if (!question) {
-            await msg.reply('You currently don\'t host a quiz! Create one with `%create <url>`.');
+    async execute(msg, args) {
+        // Check if URL is valid
+        const urlResult = URLChecker.safeParse(args[0]);
+        if (!urlResult.success) {
+            await msg.send('Invalid URL.');
+            return;
+        }
+
+        // Fetch the data as JSON
+        const url = new URL(urlResult.data);
+        const headers = new Headers({ 'Accept': 'application/json' });
+        const response = await fetch(url, {
+            method: 'GET',
+            headers,
+        });
+
+        // Validate JSON object
+        const questionResult = QuestionSchema.safeParse(await response.json());
+        if (!questionResult.success) {
+            await msg.send('Invalid JSON object.');
+            return;
+        }
+
+        // Validate question parameters
+        const { data: { description, choices, answer, limit } } = questionResult;
+        const question = Question.create(description, choices, answer, limit);
+        if (question === null) {
+            await msg.send('Invalid question parameters.');
             return;
         }
 
@@ -33,19 +66,31 @@ export const start: Command = {
             },
         });
 
-        // Apply initial reactions for UX
+        // Begin quiz timer once all reaction options are sent
+        beginCollectingFor(quiz.id);
         await quiz.addReactions(fields.map(f => f.name), true);
-
-        // Send results of the quiz
         await Std.delay(question.limit);
-        await msg.send(`**Time's up! The correct answer is ${fields[question.answer].name}.**`);
+        const collector = finishCollectingFor(quiz.id)!;
 
-        // FIXME: At the moment, we are not detecting whether the user has reacted multiple times.
-        // Compute new leaderboard
-        const reactions = await Discord.getReactions(quiz, fields[question.answer].name);
-        const winners = reactions
-            .filter(user => !user.bot && !user.system);
-        for (const winner of winners)
-            incrementWinCount(winner.id);
+        // Find the winners
+        const correctAnswer = fields[question.answer].name;
+        const winners = Array.from(collector.entries())
+            .filter(([ userID, reactions ]) => {
+                // Remove bot reactions
+                const user = Discord.cache.members.get(userID);
+                if (user?.bot || user?.system)
+                    return false;
+
+                // Only check the first emoji reaction
+                const isCorrect = reactions.values().next().value === correctAnswer;
+                if (isCorrect)
+                    incrementWinCount(userID);
+                return isCorrect;
+            })
+            .map(([ userID, _ ]) => `<@${userID}>`);
+
+        // Congratulate the winners
+        const mentions = winners.join(' ');
+        await msg.send(`**Time's up! The correct answer is ${correctAnswer}.** Congratulations ${mentions}!`);
     },
 };
