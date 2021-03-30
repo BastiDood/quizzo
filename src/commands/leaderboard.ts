@@ -13,7 +13,7 @@ export const leaderboard: Command = {
             return;
         }
 
-        const text = leaderboard.map(([ name, count ], index) => `${index + 1}. ${name} [${count}]`).join('\n');
+        const text = leaderboard.map(({ name, count }, index) => `${index + 1}. ${name} [${count}]`).join('\n');
         await msg.send(`**Leaderboard:**\n${text}`);
     },
 };

@@ -76,16 +76,18 @@ export function incrementWinCount(userID: string) {
  * Returns a sorted array of tuples
  * representing the current leaderboard.
  */
-export function getLeaderboard(): [string, number][] {
+export function getLeaderboard(): { name: string, count: number }[] {
+    const { members } = Discord.cache;
     return Array.from(leaderboard.entries())
+        .map(([ id, count ]) => {
+            const { username, discriminator } = members.get(id)!;
+            return {
+                name: `${username}#${discriminator}`,
+                count,
+            };
+        })
         .sort((a, b) => {
-            const diff = b[1] - a[1];
-            if (diff !== 0)
-                return diff;
-
-            const { members } = Discord.cache;
-            const nameA = members.get(a[0])?.username ?? a[0];
-            const nameB = members.get(b[0])?.username ?? b[0];
-            return nameA.localeCompare(nameB);
+            const diff = b.count - a.count;
+            return diff !== 0 ? diff : a.name.localeCompare(b.name);
         });
 }
