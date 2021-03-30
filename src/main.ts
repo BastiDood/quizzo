@@ -11,7 +11,7 @@ Discord.startBot({
         async messageCreate(message) {
             // Ignore system and bot messages as well
             // as the non-prefixed ones
-            if (!message.content.startsWith('%') || message.author.bot || message.author.system || !message.channel)
+            if (!message.content.startsWith('%') || message.author.bot || message.author.system)
                 return;
 
             // Parse text command
