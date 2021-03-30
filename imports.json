@@ -1,1 +1,6 @@
-{ "imports": { "deps": "./deps.ts" } }
+{
+    "imports": {
+        "deps": "./deps.ts",
+        "state": "./src/state.ts"
+    }
+}

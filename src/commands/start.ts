@@ -1,5 +1,5 @@
 import { Discord, Std } from 'deps';
-import { popQuestion } from '../state.ts';
+import { incrementWinCount, popQuestion } from 'state';
 import type { Command } from './mod.ts';
 
 export const start: Command = {
@@ -33,19 +33,19 @@ export const start: Command = {
             },
         });
 
-        // Apply initial reactions
+        // Apply initial reactions for UX
         await quiz.addReactions(fields.map(f => f.name), true);
 
-        // Wait for a given amount of time and then proceed with the tally
-        await Std.delay(question.limit);
-        const reactions = Discord.cache.messages.get(quiz.id)!.reactions;
-        if (!reactions) {
-            await msg.send('No reactions were sent.');
-            return;
-        }
-
         // Send results of the quiz
+        await Std.delay(question.limit);
         await msg.send(`**Time's up! The correct answer is ${fields[question.answer].name}.**`);
-        // TODO: Compute total reactions and correct answers for the leaderboard feature
+
+        // FIXME: At the moment, we are not detecting whether the user has reacted multiple times.
+        // Compute new leaderboard
+        const reactions = await Discord.getReactions(quiz, fields[question.answer].name);
+        const winners = reactions
+            .filter(user => !user.bot && !user.system);
+        for (const winner of winners)
+            incrementWinCount(winner.id);
     },
 };

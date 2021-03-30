@@ -1,3 +1,5 @@
+import { Discord } from 'deps';
+
 /**
  * Criteria for a valid question:
  * 1. All the required fields are defined.
@@ -15,8 +17,18 @@ export interface Question {
     limit: number;
 }
 
+interface LeaderboardEntry {
+    /** Discord User ID */
+    id: string;
+    /** Number of wins. */
+    wins: number;
+}
+
 /** Quiz registry. */
 const quizzes = new Map<string, Question>();
+
+/** Player leaderboard. */
+const leaderboard = new Map<string, number>();
 
 /**
  * Sets the current quiz of the given user.
@@ -52,4 +64,28 @@ export function popQuestion(userID: string): Question | undefined {
 
     quizzes.delete(userID);
     return question;
+}
+
+/** Increments the current user's win count. */
+export function incrementWinCount(userID: string) {
+    const count = leaderboard.get(userID) ?? 0;
+    leaderboard.set(userID, count + 1);
+}
+
+/**
+ * Returns a sorted array of tuples
+ * representing the current leaderboard.
+ */
+export function getLeaderboard(): [string, number][] {
+    return Array.from(leaderboard.entries())
+        .sort((a, b) => {
+            const diff = b[1] - a[1];
+            if (diff !== 0)
+                return diff;
+
+            const { members } = Discord.cache;
+            const nameA = members.get(a[0])?.username ?? a[0];
+            const nameB = members.get(b[0])?.username ?? b[0];
+            return nameA.localeCompare(nameB);
+        });
 }
