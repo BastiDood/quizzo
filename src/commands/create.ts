@@ -1,31 +1,40 @@
-import { setQuestion } from '../state.ts';
+import { Question, setQuestion } from '../state.ts';
 import type { Command } from './mod.ts';
+
+function validateQuestion(json: unknown): json is Question {
+    if (typeof json !== 'object' || json === null)
+        return false;
+
+    const { description, answer, choices, limit } = json as Partial<Question>;
+    return typeof description === 'string'
+        && typeof answer === 'number'
+        && choices instanceof Array
+        && choices.every(item => typeof item === 'string')
+        && typeof limit === 'number';
+}
 
 export const create: Command = {
     help: {
-        description: 'Set the given URL as the current user\'s active quiz.',
-        usage: '%create url',
+        description: 'Set the given URL as the current user\'s active quiz. The URL should link to a valid JSON file.',
+        usage: '%create <url>',
     },
     async execute(msg, args) {
         try {
             const url = new URL(args[0]);
-            const response = await fetch(url);
-            const text = await response.text();
+            const headers = new Headers({ 'Accept': 'application/json' })
+            const response = await fetch(url, {
+                method: 'GET',
+                headers,
+            });
+            const json: unknown = await response.json();
 
-            // Parsing the text file requires the text into lines.
-            // The first line serves as the question itself, while
-            // the remaining lines are the choices. Note that the
-            // choices must be length 2..=10 to be valid.
-            //
-            // # Example
-            // What does comes after 'A' in the alphabet?
-            // B
-            // C
-            // D
-            // E
-            const [ question, ...choices ] = text.split(/[\r\n]+/);
-            setQuestion(msg.author.id, question, choices);
-            await msg.reply('Successfully set you as the host of this quiz!')
+            if (!validateQuestion(json))
+                throw new TypeError('invalid JSON input');
+
+            if (!setQuestion(msg.author.id, json))
+                throw new TypeError('invalid question parameters');
+
+            await msg.reply('Successfully set you as the host of this quiz!');
         } catch {
             await msg.reply('Could not parse questionnaire.');
         }

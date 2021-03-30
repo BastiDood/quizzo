@@ -1,6 +1,9 @@
 import { Discord } from 'deps';
+
+// Command Implementations
 import { create } from './create.ts';
 import { ping } from './ping.ts';
+import { start } from './start.ts';
 
 export interface Command {
     help: {
@@ -12,8 +15,9 @@ export interface Command {
 
 /** Command registry. */
 const commands = new Map<string, Command>([
-    [ 'ping', ping ],
     [ 'create', create ],
+    [ 'ping', ping ],
+    [ 'start', start ],
 ]);
 
 /** Queries for the given command name. */
