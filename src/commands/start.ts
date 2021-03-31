@@ -90,7 +90,7 @@ export const start: Command = {
             .map(([ userID, _ ]) => `<@${userID}>`);
 
         // Congratulate the winners
-        const mentions = winners.join(' ');
-        await msg.send(`**Time's up! The correct answer is ${correctAnswer}.** Congratulations ${mentions}!`);
+        const mentions = winners.length > 0 ? ` Congratulations ${winners.join(' ')}!` : ' Nobody got it right...';
+        await msg.send(`**Time's up! The correct answer is ${correctAnswer}.**${mentions}`);
     },
 };
