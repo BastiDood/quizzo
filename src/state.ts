@@ -66,16 +66,14 @@ export function incrementWinCount(userID: string) {
  */
 export function getLeaderboard(): { name: string, count: number }[] {
     const { members } = Discord.cache;
-    return Array.from(leaderboard.entries())
-        .map(([ id, count ]) => {
-            const { username, discriminator } = members.get(id)!;
-            return {
-                name: `${username}#${discriminator}`,
-                count,
-            };
-        })
-        .sort((a, b) => {
-            const diff = b.count - a.count;
-            return diff !== 0 ? diff : a.name.localeCompare(b.name);
-        });
+    return Array.from(leaderboard.entries(), ([ id, count ]) => {
+        const { username, discriminator } = members.get(id)!;
+        return {
+            name: `${username}#${discriminator}`,
+            count,
+        };
+    }).sort((a, b) => {
+        const diff = b.count - a.count;
+        return diff !== 0 ? diff : a.name.localeCompare(b.name);
+    });
 }
