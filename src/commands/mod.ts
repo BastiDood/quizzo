@@ -22,7 +22,24 @@ const commands = new Map<string, Command>([
 
 /** Queries for the given command name. */
 export function getCommand(key: string) {
-    if (key === 'help')
-        throw new Error('not yet implemented');
-    return commands.get(key);
+    if (key !== 'help')
+        return commands.get(key);
+
+    const fields = Array.from(commands.values(), ({ help }) => ({ name: `\`${help.usage}\``, value: help.description }));
+    const execute = async (msg: Discord.Message, _: string[]) => {
+        await msg.send({
+            embed: {
+                title: 'Quizzo Help',
+                color: 0x236EA5,
+                fields,
+            },
+        });
+    };
+    return {
+        execute,
+        help: {
+            description: 'Get help information.',
+            usage: '%help',
+        },
+    } as Command;
 }
