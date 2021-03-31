@@ -17,6 +17,10 @@ export const start: Command = {
         usage: '%start <url>',
     },
     async execute(msg, args) {
+        // Immediately delete command invocation to mitigate
+        // leaking the questionnaire
+        await msg.delete();
+
         // Check if URL is valid
         const urlResult = URLChecker.safeParse(args[0]);
         if (!urlResult.success) {
