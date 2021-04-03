@@ -1,4 +1,4 @@
-import { delay } from 'https://deno.land/std@0.91.0/async/delay.ts'
+import { delay } from 'https://deno.land/std@0.92.0/async/delay.ts'
 
 export const Std = { delay };
 export * as Discord from 'https://deno.land/x/discordeno@10.5.0/mod.ts';
