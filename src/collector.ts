@@ -4,14 +4,16 @@ import { Discord } from 'deps';
 type UserReactions = Map<string, Set<string>>;
 
 /**
- * This reaction collector locally accumulates user message
- * messages sent from the `reaction-*` events.
+ * This reaction collector locally accumulates the reactions
+ * from messages sent via the `reaction-*` events. It is essentially
+ * a mapping from a **message ID** to some mapping of a **user ID**
+ * and their respective reactions.
  */
 const messages = new Map<string, UserReactions>();
 
 /**
  * Begin collecting messages for the given **message ID**.
- * Note that this overwrites previous collections, if any.
+ * Note that this overwrites previous accumulations, if any.
  */
 export function beginCollectingFor(id: string) {
     messages.set(id, new Map());
