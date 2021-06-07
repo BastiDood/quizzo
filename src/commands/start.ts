@@ -1,5 +1,5 @@
 import { beginCollectingFor, finishCollectingFor } from 'collector';
-import { Discord, Std, Zod } from 'deps';
+import { Std, Zod } from 'deps';
 import { Question, incrementWinCount } from 'state';
 import type { Command } from './mod.ts';
 
@@ -17,6 +17,10 @@ export const start: Command = {
         usage: '%start <url>',
     },
     async execute(msg, args) {
+        const { member } = msg;
+        if (member === undefined)
+            return;
+
         // Immediately delete command invocation to mitigate
         // leaking the questionnaire
         await msg.delete();
@@ -60,8 +64,8 @@ export const start: Command = {
             embed: {
                 color: 0x236EA5,
                 author: {
-                    name: msg.author.username,
-                    icon_url: msg.member?.avatarURL,
+                    name: member.username,
+                    iconUrl: member.avatarURL,
                 },
                 title: 'Quizzo Question',
                 description: question.description,
@@ -81,8 +85,7 @@ export const start: Command = {
         const winners = Array.from(collector.entries())
             .filter(([ userID, reactions ]) => {
                 // Remove bot reactions
-                const user = Discord.cache.members.get(userID);
-                if (user?.bot || user?.system)
+                if (member.bot || member.system)
                     return false;
 
                 // Only check the first emoji reaction
