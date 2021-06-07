@@ -1,6 +1,6 @@
 import { Discord } from 'deps';
 
-/** Maps a **user ID** to a set of messages. */
+/** Maps a **user ID** to a set of reactions. */
 type UserReactions = Map<string, Set<string>>;
 
 /**
@@ -9,67 +9,76 @@ type UserReactions = Map<string, Set<string>>;
  * a mapping from a **message ID** to some mapping of a **user ID**
  * and their respective reactions.
  */
-const messages = new Map<string, UserReactions>();
+const messages = new Map<bigint, UserReactions>();
 
 /**
  * Begin collecting messages for the given **message ID**.
  * Note that this overwrites previous accumulations, if any.
  */
-export function beginCollectingFor(id: string) {
+export function beginCollectingFor(id: bigint) {
     messages.set(id, new Map());
 }
 
 /** Removes the **message ID** from listeners. */
-export function finishCollectingFor(id: string): UserReactions | undefined {
+export function finishCollectingFor(id: bigint): UserReactions | undefined {
     const collector = messages.get(id);
     messages.delete(id);
     return collector;
 }
 
-// deno-lint-ignore camelcase
-export function _receiveReaction({ id, user_id, emoji, member }: Discord.MessageReactionUncachedPayload) {
-    if (emoji.name === null || member?.user.bot || member?.user.system)
+export function _receiveReaction(data: Discord.MessageReactionAdd, msg?: Discord.DiscordenoMessage) {
+    const emoji = data.emoji.name;
+    if (msg === undefined || msg.isBot || emoji === null || emoji === undefined)
         return;
 
-    const msg = messages.get(id);
-    if (msg === undefined)
+    const userReactions = messages.get(msg.id);
+    if (userReactions === undefined)
         return;
 
-    const reactions = msg.get(user_id);
+    const reactions = userReactions.get(data.userId);
     if (reactions)
-        reactions.add(emoji.name)
+        reactions.add(emoji)
     else
-        msg.set(user_id, new Set([ emoji.name ]));
+        userReactions.set(data.userId, new Set([ emoji ]));
 }
 
-export function _removeReaction({ id, emoji, member }: Discord.MessageReactionUncachedPayload, userID: string) {
-    if (emoji.name === null || member?.user.bot || member?.user.system)
+export function _removeReaction(data: Discord.MessageReactionRemove, msg?: Discord.DiscordenoMessage) {
+    if (msg === undefined || msg.isBot || data.emoji.name === null || data.emoji.name === undefined)
         return;
 
-    const msg = messages.get(id);
-    if (msg === undefined)
+    const users = messages.get(msg.id);
+    if (users === undefined)
         return;
 
-    const reactions = msg.get(userID);
+    const reactions = users.get(data.userId);
     if (reactions === undefined)
         return;
 
     // Also remove user from accumulation
     // if they have no reactions left
-    reactions.delete(emoji.name);
+    reactions.delete(data.emoji.name);
     if (reactions.size < 1)
-        msg.delete(userID);
+        users.delete(data.userId);
 }
 
-export function _clearAll(id: string) {
-    messages.delete(id);
+export function _clearAll(_: Discord.MessageReactionRemoveAll, msg?: Discord.DiscordenoMessage) {
+    if (msg === undefined)
+        return;
+    messages.delete(msg.id);
 }
 
-export function _clearAllByName(name: string) {
-    for (const reactions of messages.values())
-        for (const [ userID, reax ] of reactions) {
-            reax.delete(name);
-            if (reax.size < 1)
-                reactions.delete(userID);
-        }
+export function _clearAllByEmojiName(emoji: Partial<Discord.Emoji>, msgId: bigint) {
+    const { name } = emoji;
+    if (name === undefined || name === null)
+        return;
+
+    const userReactions = messages.get(msgId);
+    if (userReactions === undefined)
+        return;
+
+    for (const [ userId, reactions ] of userReactions.entries()) {
+        reactions.delete(name);
+        if (reactions.size < 1)
+            userReactions.delete(userId);
+    }
 }

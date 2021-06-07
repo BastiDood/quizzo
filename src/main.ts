@@ -1,5 +1,5 @@
 import { Discord, Dotenv } from 'deps';
-import { _clearAll, _clearAllByName, _receiveReaction, _removeReaction } from './collector.ts';
+import { _clearAll, _clearAllByEmojiName, _receiveReaction, _removeReaction } from './collector.ts';
 import { getCommand } from './commands/mod.ts';
 
 const { BOT_TOKEN } = Dotenv.config({ export: false, safe: true });
@@ -7,12 +7,12 @@ const { BOT_TOKEN } = Dotenv.config({ export: false, safe: true });
 Discord.startBot({
     token: BOT_TOKEN,
     compress: true,
-    intents: [ 'GUILDS', 'GUILD_MESSAGES', 'GUILD_MESSAGE_REACTIONS' ],
+    intents: [ 'Guilds', 'GuildMembers', 'GuildMessageReactions' ],
     eventHandlers: {
         async messageCreate(message) {
             // Ignore system and bot messages as well
             // as the non-prefixed ones
-            if (!message.content.startsWith('%') || message.author.bot || message.author.system)
+            if (!message.content.startsWith('%') || message.isBot)
                 return;
 
             // Parse text command
@@ -24,13 +24,10 @@ Discord.startBot({
 
             await getCommand(cmd)?.execute(message, args);
         },
-        reactionAdd(payload) { _receiveReaction(payload); },
-        reactionRemove(payload, _, userID) { _removeReaction(payload, userID); },
-        reactionRemoveAll(data) { _clearAll(data.message_id); },
-        reactionRemoveEmoji({ emoji }) {
-            if (emoji.name)
-                _clearAllByName(emoji.name);
-        },
+        reactionAdd: _receiveReaction,
+        reactionRemove: _removeReaction,
+        reactionRemoveAll: _clearAll,
+        reactionRemoveEmoji: _clearAllByEmojiName,
         ready() { console.log('Bot is online!'); },
     },
 });

@@ -10,7 +10,7 @@ export interface Command {
         readonly description: string;
         readonly usage: string;
     };
-    execute(msg: Discord.Message, args: string[]): Promise<void>;
+    execute(msg: Discord.DiscordenoMessage, args: string[]): Promise<void>;
 }
 
 /** Command registry. */
@@ -26,7 +26,7 @@ export function getCommand(key: string) {
         return commands.get(key);
 
     const fields = Array.from(commands.values(), ({ help }) => ({ name: `\`${help.usage}\``, value: help.description }));
-    const execute = async (msg: Discord.Message, _: string[]) => {
+    const execute = async (msg: Discord.DiscordenoMessage, _: string[]) => {
         await msg.send({
             embed: {
                 title: 'Quizzo Help',
