@@ -61,17 +61,19 @@ export const start: Command = {
             value: choice,
         }));
         const quiz = await msg.send({
-            embed: {
-                color: 0x236EA5,
-                author: {
-                    name: member.username,
-                    iconUrl: member.avatarURL,
-                },
-                title: 'Quizzo Question',
-                description: question.description,
-                fields,
-                footer: { text: `Time Limit: ${(question.limit / 1e3).toFixed(1)} Seconds` },
-            },
+            embeds: [
+                {
+                    color: 0x236EA5,
+                    author: {
+                        name: member.username,
+                        iconUrl: member.avatarURL,
+                    },
+                    title: 'Quizzo Question',
+                    description: question.description,
+                    fields,
+                    footer: { text: `Time Limit: ${(question.limit / 1e3).toFixed(1)} Seconds` },
+                }
+            ],
         });
 
         // Begin quiz timer once all reaction options are sent

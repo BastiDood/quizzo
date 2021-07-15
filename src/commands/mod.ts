@@ -27,13 +27,8 @@ export function getCommand(key: string) {
 
     const fields = Array.from(commands.values(), ({ help }) => ({ name: `\`${help.usage}\``, value: help.description }));
     const execute = async (msg: Discord.DiscordenoMessage, _: string[]) => {
-        await msg.send({
-            embed: {
-                title: 'Quizzo Help',
-                color: 0x236EA5,
-                fields,
-            },
-        });
+        const embeds = [ { title: 'Quizzo Help', color: 0x236EA5, fields } ];
+        await msg.send({ embeds });
     };
     return {
         execute,
