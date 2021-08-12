@@ -9,5 +9,5 @@ The `BOT_TOKEN` can be obtained from the [Discord Developer Application Console]
 Once the `.env` file is available in the root directory, it is now possible to run the bot with the following command:
 
 ```bash
-deno run --import-map=imports.json --allow-read --allow-net --allow-env src/main.ts
+deno run --config=tsconfig.json --import-map=imports.json --allow-env --allow-net --allow-env src/main.ts
 ```
