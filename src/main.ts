@@ -1,20 +1,21 @@
 import { env } from './env.ts';
-import {
-    GATEWAY_VERSION,
-    GetGatewayBotSchema,
-    DiscordWebSocketPayloadSchema,
-} from './model/mod.ts';
+import { startBot, DiscordInteractionTypes } from 'discord';
 
-// Probe the gateway for the WebSocket URL
-const gatewayProbe = await fetch('https://discord.com/api/gateway/bot', {
-    method: 'GET',
-    headers: { Authorization: env.BOT_TOKEN },
-});
-const gatewayProbeResponse = await gatewayProbe.json();
-const { url: wsUrl } = GetGatewayBotSchema.parse(gatewayProbeResponse);
-
-// Initiate handshake with the gateway
-const socket = new WebSocket(wsUrl + `?v=${GATEWAY_VERSION}&encoding=json`);
-socket.addEventListener('message', function (evt) {
-    const payload = DiscordWebSocketPayloadSchema.parse(JSON.parse(evt.data));
+await startBot({
+    token: env.BOT_TOKEN,
+    intents: [],
+    compress: true,
+    eventHandlers: {
+        ready() {
+            console.log('Bot is ready!');
+        },
+        interactionCreate(payload) {
+            switch (payload.type) {
+                case DiscordInteractionTypes.ApplicationCommand:
+                    return;
+                case DiscordInteractionTypes.MessageComponent:
+                    return;
+            }
+        },
+    },
 });
