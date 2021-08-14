@@ -1,6 +1,7 @@
 use crate::model::Quiz;
 use hyper::{body::to_bytes, client::HttpConnector, Client, Uri};
 use hyper_rustls::HttpsConnector;
+use itertools::Itertools;
 use serde_json::{from_slice, json, Value};
 use serenity::{
     client::{Context, EventHandler},
@@ -12,12 +13,13 @@ use serenity::{
         prelude::Ready,
     },
 };
+use slab::Slab;
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
-use tokio::time::sleep;
+use tokio::{sync::Mutex, time::sleep};
 
 const START_COMMAND_NAME: &str = "start";
 const START_COMMAND_ARG: &str = "url";
@@ -26,7 +28,7 @@ pub struct Handler {
     http: Client<HttpsConnector<HttpConnector>>,
     guild_id: u64,
     command_id: AtomicU64,
-    quizzes: HashMap<Box<str>, u8>,
+    quizzes: Mutex<Slab<HashSet<Box<str>>>>,
 }
 
 impl From<u64> for Handler {
@@ -150,8 +152,39 @@ impl EventHandler for Handler {
                     return;
                 }
 
+                // Register the quiz
+                let mut quizzes = self.quizzes.lock().await;
+                let quiz_id = quizzes.insert(Default::default());
+                drop(quizzes);
+
+                // Respond to the user
+                // TODO: add message component
+                let response_options = json!({
+                    "type": 4,
+                    "data": { "content": question },
+                });
+                ctx.http
+                    .create_interaction_response(
+                        interaction.id.0,
+                        interaction.token.as_str(),
+                        &response_options,
+                    )
+                    .await
+                    .expect("cannot send response");
+
                 // Execute the quiz
                 sleep(Duration::from_secs(timeout)).await;
+                let mut quizzes = self.quizzes.lock().await;
+                let tally = quizzes.remove(quiz_id);
+                drop(quizzes);
+
+                // Count the tally
+                #[allow(unstable_name_collisions)]
+                let mentions: String = tally
+                    .into_iter()
+                    .map(|id| format!("<@{}>", id))
+                    .intersperse(String::from(" "))
+                    .collect();
             }
             InteractionData::MessageComponent(data) => todo!(),
         }
