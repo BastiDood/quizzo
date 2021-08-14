@@ -34,7 +34,7 @@ pub struct Handler {
     http: Client<HttpsConnector<HttpConnector>>,
     guild_id: u64,
     command_id: AtomicU64,
-    quizzes: Mutex<Slab<(usize, HashSet<Box<str>>)>>,
+    quizzes: Mutex<Slab<(usize, HashSet<u64>)>>,
 }
 
 impl From<u64> for Handler {
@@ -224,7 +224,54 @@ impl EventHandler for Handler {
                 component_type: ComponentType::SelectMenu,
                 values,
                 ..
-            })) => {}
+            })) => {
+                let quiz_id = match custom_id.parse::<usize>() {
+                    Ok(id) => id,
+                    _ => return,
+                };
+
+                let choice = match values.first().and_then(|val| val.parse::<usize>().ok()) {
+                    Some(val) => val,
+                    _ => return,
+                };
+
+                let user_id = match interaction
+                    .member
+                    .map(|member| member.user)
+                    .xor(interaction.user)
+                {
+                    Some(user) => user.id.0,
+                    _ => return,
+                };
+
+                let mut quizzes = self.quizzes.lock().await;
+                let &mut (answer, ref mut tally) = match quizzes.get_mut(quiz_id) {
+                    Some(pair) => pair,
+                    _ => return,
+                };
+                if choice == answer {
+                    tally.insert(user_id);
+                } else {
+                    tally.remove(&user_id);
+                }
+                drop(quizzes);
+
+                let response_options = json!({
+                    "type": 4,
+                    "data": {
+                        "content": "I have received your response.",
+                        "flags": InteractionApplicationCommandCallbackDataFlags::EPHEMERAL,
+                    },
+                });
+                ctx.http
+                    .create_interaction_response(
+                        interaction.id.0,
+                        interaction.token.as_str(),
+                        &response_options,
+                    )
+                    .await
+                    .expect("cannot send response");
+            }
             _ => unimplemented!(),
         }
     }
