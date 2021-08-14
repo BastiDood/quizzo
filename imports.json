@@ -1,7 +1,0 @@
-{
-    "imports": {
-        "std/": "https://deno.land/std@0.104.0/",
-        "discord": "https://deno.land/x/discordeno@12.0.1/mod.ts",
-        "zod": "https://deno.land/x/zod@v3.7.0/index.ts"
-    }
-}
