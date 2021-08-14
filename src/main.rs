@@ -1,5 +1,6 @@
 mod error;
 mod handler;
+mod model;
 
 use error::AppError;
 use handler::Handler;

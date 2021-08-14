@@ -1,13 +1,13 @@
-use hyper::{client::HttpConnector, Client, Uri};
+use crate::model::Quiz;
+use hyper::{body::to_bytes, client::HttpConnector, Client, Uri};
 use hyper_rustls::HttpsConnector;
-use serde_json::{json, Value};
+use serde_json::{from_slice, json, Value};
 use serenity::{
     client::{Context, EventHandler},
     model::{
         interactions::{
             ApplicationCommandOptionType, Interaction,
             InteractionApplicationCommandCallbackDataFlags, InteractionData,
-            InteractionResponseType,
         },
         prelude::Ready,
     },
@@ -15,7 +15,9 @@ use serenity::{
 use std::{
     collections::HashMap,
     sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
 };
+use tokio::time::sleep;
 
 const START_COMMAND_NAME: &str = "start";
 const START_COMMAND_ARG: &str = "url";
@@ -43,7 +45,7 @@ impl From<u64> for Handler {
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, data: Ready) {
+    async fn ready(&self, ctx: Context, _: Ready) {
         println!("Registering commands...");
         let start_command_opts = json!({
             "name": START_COMMAND_NAME,
@@ -108,7 +110,6 @@ impl EventHandler for Handler {
                 {
                     Some(val) => val,
                     _ => {
-                        // TODO: Add response to user
                         let response_options = json!({
                             "type": 4,
                             "data": {
@@ -116,9 +117,41 @@ impl EventHandler for Handler {
                                 "flags": InteractionApplicationCommandCallbackDataFlags::EPHEMERAL,
                             },
                         });
+                        ctx.http
+                            .create_interaction_response(
+                                interaction.id.0,
+                                interaction.token.as_str(),
+                                &response_options,
+                            )
+                            .await
+                            .expect("cannot send response");
                         return;
                     }
                 };
+
+                // Fetch the JSON quiz
+                let body = self
+                    .http
+                    .get(value)
+                    .await
+                    .expect("cannot get response body")
+                    .into_body();
+                let bytes = to_bytes(body).await.expect("cannot convert body to bytes");
+                let Quiz {
+                    question,
+                    answer,
+                    choices,
+                    timeout,
+                } = from_slice::<Quiz>(&bytes).expect("failed to deserialize quiz");
+
+                // Validate the quiz
+                if answer >= choices.len() || timeout < 15 || timeout > 30 {
+                    // TODO: Send response to user
+                    return;
+                }
+
+                // Execute the quiz
+                sleep(Duration::from_secs(timeout)).await;
             }
             InteractionData::MessageComponent(data) => todo!(),
         }
