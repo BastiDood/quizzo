@@ -1,5 +1,9 @@
 use crate::model::Quiz;
-use hyper::{body::to_bytes, client::HttpConnector, Client, Uri};
+use hyper::{
+    body::{to_bytes, Bytes},
+    client::HttpConnector,
+    Client, Uri,
+};
 use hyper_rustls::HttpsConnector;
 use itertools::Itertools;
 use serde_json::{from_slice, json, Value};
@@ -15,6 +19,7 @@ use serenity::{
 };
 use slab::Slab;
 use std::{
+    borrow::Cow,
     collections::HashSet,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -28,7 +33,7 @@ pub struct Handler {
     http: Client<HttpsConnector<HttpConnector>>,
     guild_id: u64,
     command_id: AtomicU64,
-    quizzes: Mutex<Slab<HashSet<Box<str>>>>,
+    quizzes: Mutex<Slab<(usize, HashSet<Box<str>>)>>,
 }
 
 impl From<u64> for Handler {
@@ -71,17 +76,6 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        // Check if the user exists
-        let user = match interaction
-            .member
-            .as_ref()
-            .map(|member| &member.user)
-            .xor(interaction.user.as_ref())
-        {
-            Some(pair) => pair,
-            _ => return,
-        };
-
         // Check if there exists some interaction data
         let data = match interaction.data.as_ref() {
             Some(data) => data,
@@ -132,13 +126,10 @@ impl EventHandler for Handler {
                 };
 
                 // Fetch the JSON quiz
-                let body = self
-                    .http
-                    .get(value)
+                let bytes = self
+                    .fetch(value)
                     .await
-                    .expect("cannot get response body")
-                    .into_body();
-                let bytes = to_bytes(body).await.expect("cannot convert body to bytes");
+                    .expect("cannot convert body to bytes");
                 let Quiz {
                     question,
                     answer,
@@ -153,15 +144,41 @@ impl EventHandler for Handler {
                 }
 
                 // Register the quiz
-                let mut quizzes = self.quizzes.lock().await;
-                let quiz_id = quizzes.insert(Default::default());
-                drop(quizzes);
+                let quiz_id = {
+                    let mut quizzes = self.quizzes.lock().await;
+                    quizzes.insert((answer, Default::default()))
+                };
 
                 // Respond to the user
-                // TODO: add message component
+                let component_options: Vec<_> = choices
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .map(|(index, choice)| {
+                        json!({
+                            "label": choice,
+                            "value": index.to_string(),
+                        })
+                    })
+                    .collect();
                 let response_options = json!({
                     "type": 4,
-                    "data": { "content": question },
+                    "data": {
+                        "content": question,
+                        "components": [
+                            {
+                                "type": 1,
+                                "components": [
+                                    {
+                                        "type": 3,
+                                        "custom_id": quiz_id.to_string(),
+                                        "placeholder": "Your Answer",
+                                        "options": component_options,
+                                    }
+                                ],
+                            }
+                        ],
+                    },
                 });
                 ctx.http
                     .create_interaction_response(
@@ -174,17 +191,40 @@ impl EventHandler for Handler {
 
                 // Execute the quiz
                 sleep(Duration::from_secs(timeout)).await;
-                let mut quizzes = self.quizzes.lock().await;
-                let tally = quizzes.remove(quiz_id);
-                drop(quizzes);
+                let (_, tally) = {
+                    let mut quizzes = self.quizzes.lock().await;
+                    quizzes.remove(quiz_id)
+                };
 
                 // Count the tally
                 #[allow(unstable_name_collisions)]
-                let mentions: String = tally
-                    .into_iter()
-                    .map(|id| format!("<@{}>", id))
-                    .intersperse(String::from(" "))
-                    .collect();
+                let mentions = if tally.is_empty() {
+                    Cow::Borrowed("Nobody got the correct answer...")
+                } else {
+                    let winners: String = tally
+                        .iter()
+                        .map(|id| Cow::Owned(format!("<@{}>", id)))
+                        .intersperse(Cow::Borrowed(" "))
+                        .collect();
+                    Cow::Owned(format!("Congratulations to {}!", winners))
+                };
+
+                // Notify users of quiz result
+                let notify_options = json!({
+                    "type": 4,
+                    "data": {
+                        "content": format!("The correct answer is **{}**. {}", choices[answer], mentions),
+                        "allowed_mentions": tally,
+                    },
+                });
+                ctx.http
+                    .create_interaction_response(
+                        interaction.id.0,
+                        interaction.token.as_str(),
+                        &notify_options,
+                    )
+                    .await
+                    .expect("cannot send response");
             }
             InteractionData::MessageComponent(data) => todo!(),
         }
@@ -192,5 +232,8 @@ impl EventHandler for Handler {
 }
 
 impl Handler {
-    async fn fetch(uri: Uri) {}
+    async fn fetch(&self, uri: Uri) -> hyper::Result<Bytes> {
+        let body = self.http.get(uri).await?.into_body();
+        to_bytes(body).await
+    }
 }
