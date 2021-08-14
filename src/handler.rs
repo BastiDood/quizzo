@@ -11,8 +11,9 @@ use serenity::{
     client::{Context, EventHandler},
     model::{
         interactions::{
-            ApplicationCommandOptionType, Interaction,
-            InteractionApplicationCommandCallbackDataFlags, InteractionData,
+            ApplicationCommandInteractionData, ApplicationCommandOptionType, ComponentType,
+            Interaction, InteractionApplicationCommandCallbackDataFlags, InteractionData,
+            MessageComponent,
         },
         prelude::Ready,
     },
@@ -76,23 +77,15 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        // Check if there exists some interaction data
-        let data = match interaction.data.as_ref() {
-            Some(data) => data,
-            _ => return,
-        };
-
-        // Respond to the user
-        match data {
-            InteractionData::ApplicationCommand(data) => {
-                // Check if the command is indeed correct
-                let command_id = self.command_id.load(Ordering::Acquire);
-                if data.id != command_id || data.name != START_COMMAND_NAME {
-                    return;
-                }
-
+        match interaction.data {
+            Some(InteractionData::ApplicationCommand(ApplicationCommandInteractionData {
+                id,
+                name,
+                options,
+                ..
+            })) if name == START_COMMAND_NAME && id == self.command_id.load(Ordering::Acquire) => {
                 // Check if correct arguments are given
-                let argument = match data.options.first() {
+                let argument = match options.first() {
                     Some(arg) if arg.name == START_COMMAND_ARG => arg,
                     _ => return,
                 };
@@ -226,7 +219,13 @@ impl EventHandler for Handler {
                     .await
                     .expect("cannot send response");
             }
-            InteractionData::MessageComponent(data) => todo!(),
+            Some(InteractionData::MessageComponent(MessageComponent {
+                custom_id,
+                component_type: ComponentType::SelectMenu,
+                values,
+                ..
+            })) => {}
+            _ => unimplemented!(),
         }
     }
 }
