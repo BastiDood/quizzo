@@ -69,24 +69,30 @@ impl EventHandler for Handler {
             ],
         });
 
-        let command = match ctx
+        let command = ctx
             .http
             .create_guild_application_command(self.guild_id, &start_command_opts)
             .await
-        {
-            Ok(comm) => comm,
-            Err(err) => {
-                eprintln!("Cannot initialize bot.");
-                eprintln!("{}", err);
-                return;
-            }
-        };
+            .expect("cannot initialize guild command");
 
-        self.command_id.store(command.id.into(), Ordering::Release);
+        self.command_id.store(command.id.0, Ordering::Release);
         println!("Bot is ready!");
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        let user_id = match interaction
+            .member
+            .map(|member| member.user)
+            .xor(interaction.user)
+        {
+            Some(user) => user.id.0,
+            // Ignore protocol violations
+            _ => {
+                eprintln!("Protocol violation detected.");
+                return;
+            }
+        };
+
         let result = match interaction.data {
             Some(InteractionData::ApplicationCommand(ApplicationCommandInteractionData {
                 id,
@@ -108,15 +114,6 @@ impl EventHandler for Handler {
                 values,
                 ..
             })) => {
-                let user_id = match interaction
-                    .member
-                    .map(|member| member.user)
-                    .xor(interaction.user)
-                {
-                    Some(user) => user.id.0,
-                    _ => return,
-                };
-
                 self.execute_component_response(
                     &ctx.http,
                     interaction.id.0,
@@ -129,6 +126,29 @@ impl EventHandler for Handler {
             }
             _ => Err(SlashCommandError::Unrecognized),
         };
+
+        let message = match result {
+            Err(SlashCommandError::InvalidArgs) => "Invalid arguments.",
+            Err(SlashCommandError::MalformedInput) => "Malformed input data.",
+            Err(SlashCommandError::FailedFetch) => "Cannot fetch JSON.",
+            Err(SlashCommandError::Fatal) => "Fatal error encountered.",
+            Err(SlashCommandError::Unrecognized) | Ok(_) => "Unrecognized command.",
+        };
+        let response_options = json!({
+            "type": 4,
+            "data": {
+                "content": message,
+                "flags": InteractionApplicationCommandCallbackDataFlags::EPHEMERAL,
+            },
+        });
+        ctx.http
+            .create_interaction_response(
+                interaction.id.0,
+                interaction.token.as_str(),
+                &response_options,
+            )
+            .await
+            .expect("cannot send interaction response");
     }
 }
 
@@ -166,7 +186,7 @@ impl Handler {
             answer,
             choices,
             timeout,
-        } = from_slice::<Quiz>(&bytes)?;
+        } = from_slice(&bytes)?;
 
         // Validate the quiz
         if answer >= choices.len() || timeout < 15 || timeout > 30 {
@@ -257,8 +277,7 @@ impl Handler {
     ) -> Result<(), SlashCommandError> {
         let quiz_id = custom_id
             .parse()
-            .map_err(|_| SlashCommandError::MalformedInput)?;
-
+            .map_err(|_| SlashCommandError::InvalidArgs)?;
         let choice = values
             .first()
             .and_then(|val| val.parse::<usize>().ok())
