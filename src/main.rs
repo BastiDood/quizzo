@@ -17,7 +17,7 @@ fn main() -> Result<(), AppError> {
     let guild_id = var("GUILD_ID")?
         .parse::<u64>()
         .map_err(|_| AppError::MissingEnvVars)?;
-    let runtime = Builder::new_current_thread().build()?;
+    let runtime = Builder::new_current_thread().enable_all().build()?;
     runtime.block_on(async move {
         println!("Connecting to Discord...");
         let mut client = Client::builder(bot_token)
