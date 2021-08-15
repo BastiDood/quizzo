@@ -11,6 +11,9 @@ use tokio::runtime::Builder;
 
 fn main() -> Result<(), AppError> {
     let bot_token = var("BOT_TOKEN")?;
+    let application_id = var("APPLICATION_ID")?
+        .parse::<u64>()
+        .map_err(|_| AppError::MissingEnvVars)?;
     let guild_id = var("GUILD_ID")?
         .parse::<u64>()
         .map_err(|_| AppError::MissingEnvVars)?;
@@ -18,6 +21,7 @@ fn main() -> Result<(), AppError> {
     runtime.block_on(async move {
         println!("Connecting to Discord...");
         let mut client = Client::builder(bot_token)
+            .application_id(application_id)
             .event_handler(Handler::from(guild_id))
             .await?;
         println!("Starting client...");
