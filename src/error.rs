@@ -2,6 +2,7 @@ use hyper::Error as HyperError;
 use serde_json::error::{Category, Error as JsonError};
 use serenity::Error as SerenityError;
 use std::{env::VarError, io::Error as IoError};
+use tokio::task::JoinError;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -54,6 +55,12 @@ impl From<JsonError> for SlashCommandError {
 
 impl From<SerenityError> for SlashCommandError {
     fn from(_: SerenityError) -> Self {
+        Self::Fatal
+    }
+}
+
+impl From<JoinError> for SlashCommandError {
+    fn from(_: JoinError) -> Self {
         Self::Fatal
     }
 }

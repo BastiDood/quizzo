@@ -12,9 +12,14 @@ use serenity::{
     http::Http,
     model::{
         interactions::{
-            ApplicationCommandInteractionData, ApplicationCommandInteractionDataOption,
-            ApplicationCommandOptionType, ComponentType, Interaction,
-            InteractionApplicationCommandCallbackDataFlags, InteractionData, MessageComponent,
+            application_command::{
+                ApplicationCommandInteraction, ApplicationCommandInteractionData,
+                ApplicationCommandInteractionDataOption,
+            },
+            message_component::{
+                ComponentType, MessageComponentInteraction, MessageComponentInteractionData,
+            },
+            Interaction, InteractionApplicationCommandCallbackDataFlags,
         },
         prelude::Ready,
     },
@@ -61,7 +66,7 @@ impl EventHandler for Handler {
             "description": "Start a new quiz.",
             "options": [
                 {
-                    "type": ApplicationCommandOptionType::String,
+                    "type": 3,
                     "name": START_COMMAND_ARG,
                     "description": "The URL to which the JSON quiz is found.",
                     "required": true,
@@ -80,46 +85,44 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        let user_id = match interaction
-            .member
-            .map(|member| member.user)
-            .xor(interaction.user)
-        {
-            Some(user) => user.id.0,
-            // Ignore protocol violations
-            _ => {
-                eprintln!("Protocol violation detected.");
-                return;
-            }
-        };
-
-        let result = match interaction.data {
-            Some(InteractionData::ApplicationCommand(ApplicationCommandInteractionData {
+        let result = match &interaction {
+            Interaction::ApplicationCommand(ApplicationCommandInteraction {
                 id,
-                name,
-                options,
+                user,
+                token,
+                data:
+                    ApplicationCommandInteractionData {
+                        id: command_id,
+                        name,
+                        options,
+                        ..
+                    },
                 ..
-            })) if name == START_COMMAND_NAME && id == self.command_id.load(Ordering::Acquire) => {
-                self.execute_start_command(
-                    &ctx.http,
-                    interaction.id.0,
-                    interaction.token.as_str(),
-                    options.as_slice(),
-                )
-                .await
+            }) if name == START_COMMAND_NAME
+                && command_id.0 == self.command_id.load(Ordering::Acquire) =>
+            {
+                self.execute_start_command(&ctx.http, id.0, token.as_str(), options.as_slice())
+                    .await
             }
-            Some(InteractionData::MessageComponent(MessageComponent {
-                custom_id,
-                component_type: ComponentType::SelectMenu,
-                values,
+            Interaction::MessageComponent(MessageComponentInteraction {
+                id,
+                user,
+                token,
+                data:
+                    MessageComponentInteractionData {
+                        custom_id,
+                        component_type: ComponentType::SelectMenu,
+                        values,
+                        ..
+                    },
                 ..
-            })) => {
+            }) => {
                 self.execute_component_response(
                     &ctx.http,
-                    interaction.id.0,
-                    interaction.token.as_str(),
+                    id.0,
+                    token.as_str(),
                     custom_id.as_str(),
-                    user_id,
+                    user.id.0,
                     values.as_slice(),
                 )
                 .await
@@ -128,12 +131,14 @@ impl EventHandler for Handler {
         };
 
         let message = match result {
+            Ok(_) => return,
             Err(SlashCommandError::InvalidArgs) => "Invalid arguments.",
             Err(SlashCommandError::MalformedInput) => "Malformed input data.",
             Err(SlashCommandError::FailedFetch) => "Cannot fetch JSON.",
             Err(SlashCommandError::Fatal) => "Fatal error encountered.",
-            Err(SlashCommandError::Unrecognized) | Ok(_) => "Unrecognized command.",
+            Err(SlashCommandError::Unrecognized) => "Unrecognized command.",
         };
+
         let response_options = json!({
             "type": 4,
             "data": {
@@ -142,11 +147,7 @@ impl EventHandler for Handler {
             },
         });
         ctx.http
-            .create_interaction_response(
-                interaction.id.0,
-                interaction.token.as_str(),
-                &response_options,
-            )
+            .create_interaction_response(interaction.id().0, interaction.token(), &response_options)
             .await
             .expect("cannot send interaction response");
     }
@@ -261,8 +262,7 @@ impl Handler {
                 "allowed_mentions": tally,
             },
         });
-        ctx.create_interaction_response(id, token, &notify_options)
-            .await?;
+        ctx.create_followup_message(token, &notify_options).await?;
         Ok(())
     }
 
@@ -299,7 +299,7 @@ impl Handler {
             "type": 4,
             "data": {
                 "content": "I have received your response.",
-                "flags": InteractionApplicationCommandCallbackDataFlags::EPHEMERAL,
+                "flags": 1 << 6,
             },
         });
         ctx.create_interaction_response(id, token, &response_options)
