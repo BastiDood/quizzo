@@ -234,8 +234,7 @@ impl Handler {
             .await?;
 
         // Execute the quiz
-        // TODO: sleep(Duration::from_secs(timeout)).await;
-        sleep(Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(timeout)).await;
         let (_, tally) = {
             let mut quizzes = self.quizzes.lock().await;
             quizzes.remove(quiz_id)
