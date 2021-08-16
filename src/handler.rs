@@ -4,7 +4,7 @@ use hyper::{
     client::HttpConnector,
     Client, Uri,
 };
-use hyper_rustls::HttpsConnector;
+use hyper_tls::HttpsConnector;
 use itertools::Itertools;
 use serde_json::{from_slice, json, Value};
 use serenity::{
@@ -46,9 +46,12 @@ pub struct Handler {
 
 impl From<Option<NonZeroU64>> for Handler {
     fn from(guild_id: Option<NonZeroU64>) -> Self {
-        let connector = HttpsConnector::with_native_roots();
+        let mut connector = HttpsConnector::new();
+        connector.https_only(true);
+
         let mut client = Client::builder();
         client.http2_only(true);
+
         Self {
             guild_id,
             http: client.build(connector),

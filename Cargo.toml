@@ -5,7 +5,7 @@ edition = "2018"
 resolver = "2"
 
 [dependencies]
-hyper-rustls = "0.22"
+hyper-tls = "0.5"
 itertools = "0.10"
 serde_json = "1.0"
 slab = "0.4"
