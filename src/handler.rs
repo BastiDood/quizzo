@@ -45,7 +45,7 @@ pub struct Handler {
 
 impl From<u64> for Handler {
     fn from(guild_id: u64) -> Self {
-        let connector = HttpsConnector::with_native_roots();
+        let connector = HttpsConnector::with_webpki_roots();
         let mut client = Client::builder();
         client.http2_only(true);
         Self {
