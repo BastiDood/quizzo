@@ -1,5 +1,5 @@
 # Quizzo
-_Quizzo_ is a [Discord bot](https://discord.com/api/oauth2/authorize?client_id=402094950562529281&scope=applications.commands) for making simple quizzes.
+_Quizzo_ is a [Discord bot](https://discord.com/api/oauth2/authorize?client_id=823813267133956136&scope=applications.commands) for making simple quizzes.
 
 # Development
 This bot is powered by the [Serenity framework](https://docs.rs/serenity) for the [Rust programming language](https://www.rust-lang.org/tools/install). Before running the bot, the following environment variables must be set:
