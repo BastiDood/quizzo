@@ -28,6 +28,7 @@ use slab::Slab;
 use std::{
     borrow::Cow,
     collections::HashSet,
+    num::NonZeroU64,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
@@ -38,13 +39,13 @@ const START_COMMAND_ARG: &str = "url";
 
 pub struct Handler {
     http: Client<HttpsConnector<HttpConnector>>,
-    guild_id: u64,
+    guild_id: Option<NonZeroU64>,
     command_id: AtomicU64,
     quizzes: Mutex<Slab<(usize, HashSet<u64>)>>,
 }
 
-impl From<u64> for Handler {
-    fn from(guild_id: u64) -> Self {
+impl From<Option<NonZeroU64>> for Handler {
+    fn from(guild_id: Option<NonZeroU64>) -> Self {
         let connector = HttpsConnector::with_native_roots();
         let mut client = Client::builder();
         client.http2_only(true);
@@ -74,12 +75,17 @@ impl EventHandler for Handler {
             ],
         });
 
-        let command = ctx
-            .http
-            .create_guild_application_command(self.guild_id, &start_command_opts)
-            .await
-            .expect("cannot initialize guild command");
+        let maybe_command = if let Some(guild_id) = self.guild_id.map(NonZeroU64::get) {
+            ctx.http
+                .create_guild_application_command(guild_id, &start_command_opts)
+                .await
+        } else {
+            ctx.http
+                .create_global_application_command(&start_command_opts)
+                .await
+        };
 
+        let command = maybe_command.expect("cannot initialize guild command");
         self.command_id.store(command.id.0, Ordering::Release);
         println!("Bot is ready!");
     }

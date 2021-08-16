@@ -6,7 +6,7 @@ use error::AppError;
 use handler::Handler;
 
 use serenity::Client;
-use std::env::var;
+use std::{env::var, num::NonZeroU64};
 use tokio::runtime::Builder;
 
 fn main() -> Result<(), AppError> {
@@ -17,7 +17,8 @@ fn main() -> Result<(), AppError> {
         .map_err(|_| AppError::MissingEnvVars)?;
     let guild_id = var("GUILD_ID")?
         .parse::<u64>()
-        .map_err(|_| AppError::MissingEnvVars)?;
+        .ok()
+        .and_then(NonZeroU64::new);
 
     // Launch Tokio async runtime
     let runtime = Builder::new_current_thread().enable_all().build()?;
