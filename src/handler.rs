@@ -4,7 +4,7 @@ use hyper::{
     client::HttpConnector,
     Client, Uri,
 };
-use hyper_tls::HttpsConnector;
+use hyper_rustls::HttpsConnector;
 use itertools::Itertools;
 use serde_json::{from_slice, json, Value};
 use serenity::{
@@ -19,7 +19,7 @@ use serenity::{
             message_component::{
                 ComponentType, MessageComponentInteraction, MessageComponentInteractionData,
             },
-            Interaction, InteractionApplicationCommandCallbackDataFlags,
+            Interaction,
         },
         prelude::Ready,
     },
@@ -46,9 +46,7 @@ pub struct Handler {
 
 impl From<Option<NonZeroU64>> for Handler {
     fn from(guild_id: Option<NonZeroU64>) -> Self {
-        let mut connector = HttpsConnector::new();
-        connector.https_only(true);
-
+        let connector = HttpsConnector::with_webpki_roots();
         let mut client = Client::builder();
         client.http2_only(true);
 
@@ -151,11 +149,11 @@ impl EventHandler for Handler {
             "type": 4,
             "data": {
                 "content": message,
-                "flags": InteractionApplicationCommandCallbackDataFlags::EPHEMERAL,
+                "flags": 64,
             },
         });
         ctx.http
-            .create_followup_message(interaction.token(), &response_options)
+            .create_interaction_response(interaction.id().0, interaction.token(), &response_options)
             .await
             .expect("cannot send interaction response");
     }
@@ -163,7 +161,7 @@ impl EventHandler for Handler {
 
 impl Handler {
     async fn fetch(&self, uri: Uri) -> hyper::Result<Bytes> {
-        let body = self.http.get(uri).await?.into_body();
+        let body = dbg!(self.http.get(uri).await)?.into_body();
         to_bytes(body).await
     }
 
