@@ -161,7 +161,7 @@ impl EventHandler for Handler {
 
 impl Handler {
     async fn fetch(&self, uri: Uri) -> hyper::Result<Bytes> {
-        let body = dbg!(self.http.get(uri).await)?.into_body();
+        let body = self.http.get(uri).await?.into_body();
         to_bytes(body).await
     }
 
