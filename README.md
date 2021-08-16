@@ -1,13 +1,18 @@
 # Quizzo
-_Quizzo_ is a [Discord bot](https://discord.com/api/oauth2/authorize?client_id=823813267133956136&permissions=75840&scope=bot) for making simple quizzes.
+_Quizzo_ is a [Discord bot](https://discord.com/api/oauth2/authorize?client_id=402094950562529281&scope=applications.commands) for making simple quizzes.
 
 # Development
-This bot is powered by the [Deno](https://deno.land/) TypeScript runtime. To start the bot, provide a `.env` file in the project root directory containing your application's `BOT_TOKEN`. Alternatively, this can be defined as an environment variable beforehand.
+This bot is powered by the [Serenity framework](https://docs.rs/serenity) for the [Rust programming language](https://www.rust-lang.org/tools/install). Before running the bot, the following environment variables must be set:
 
-The `BOT_TOKEN` can be obtained from the [Discord Developer Application Console](https://discord.com/developers/applications). See [`.env.example`](.env.example) for example.
+**Variable**     | **Description**
+---------------- | -------------------------------------------------------------------------------------------------------
+`GUILD_ID`       | Guild to which commands are locally set.
+`APPLICATION_ID` | Application ID provided by the [Discord Developer Portal](https://discord.com/developers/applications).
+`BOT_TOKEN`      | Bot token provided by the [Discord Developer Portal](https://discord.com/developers/applications).
 
-Once the `.env` file is available in the root directory, it is now possible to run the bot with the following command:
+Once these are available, one may use Rust's built-in package manager [Cargo](https://doc.rust-lang.org/cargo/) to launch the bot.
 
 ```bash
-deno run --config=tsconfig.json --import-map=imports.json --allow-env --allow-net --allow-env src/main.ts
+# Start the bot!
+cargo run --release
 ```
