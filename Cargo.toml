@@ -28,4 +28,4 @@ features = ["client", "gateway", "model", "rustls_backend", "unstable_discord_ap
 [dependencies.tokio]
 version = "1.10"
 default-features = false
-features = ["rt", "signal", "sync", "time"]
+features = ["rt", "sync", "time"]
