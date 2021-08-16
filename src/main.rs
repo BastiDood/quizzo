@@ -10,6 +10,7 @@ use std::env::var;
 use tokio::runtime::Builder;
 
 fn main() -> Result<(), AppError> {
+    // Retrieve environment variables
     let bot_token = var("BOT_TOKEN")?;
     let application_id = var("APPLICATION_ID")?
         .parse::<u64>()
@@ -17,6 +18,8 @@ fn main() -> Result<(), AppError> {
     let guild_id = var("GUILD_ID")?
         .parse::<u64>()
         .map_err(|_| AppError::MissingEnvVars)?;
+
+    // Launch Tokio async runtime
     let runtime = Builder::new_current_thread().enable_all().build()?;
     runtime.block_on(async move {
         println!("Connecting to Discord...");

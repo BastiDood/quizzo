@@ -88,7 +88,6 @@ impl EventHandler for Handler {
         let result = match &interaction {
             Interaction::ApplicationCommand(ApplicationCommandInteraction {
                 id,
-                user,
                 token,
                 data:
                     ApplicationCommandInteractionData {
@@ -147,7 +146,7 @@ impl EventHandler for Handler {
             },
         });
         ctx.http
-            .create_interaction_response(interaction.id().0, interaction.token(), &response_options)
+            .create_followup_message(interaction.token(), &response_options)
             .await
             .expect("cannot send interaction response");
     }
@@ -235,7 +234,8 @@ impl Handler {
             .await?;
 
         // Execute the quiz
-        sleep(Duration::from_secs(timeout)).await;
+        // TODO: sleep(Duration::from_secs(timeout)).await;
+        sleep(Duration::from_secs(3)).await;
         let (_, tally) = {
             let mut quizzes = self.quizzes.lock().await;
             quizzes.remove(quiz_id)
@@ -255,12 +255,13 @@ impl Handler {
         };
 
         // Notify users of quiz result
+        let message = format!(
+            "The correct answer is **{}**. {}",
+            choices[answer], mentions
+        );
         let notify_options = json!({
-            "type": 4,
-            "data": {
-                "content": format!("The correct answer is **{}**. {}", choices[answer], mentions),
-                "allowed_mentions": tally,
-            },
+            "content": message.as_str(),
+            "allowed_mentions": { "users": tally },
         });
         ctx.create_followup_message(token, &notify_options).await?;
         Ok(())
@@ -275,6 +276,7 @@ impl Handler {
         user_id: u64,
         values: &[String],
     ) -> Result<(), SlashCommandError> {
+        // Verify arguments
         let quiz_id = custom_id
             .parse()
             .map_err(|_| SlashCommandError::InvalidArgs)?;
@@ -283,6 +285,7 @@ impl Handler {
             .and_then(|val| val.parse::<usize>().ok())
             .ok_or(SlashCommandError::InvalidArgs)?;
 
+        // Register user's answer
         {
             let mut quizzes = self.quizzes.lock().await;
             let &mut (answer, ref mut tally) = quizzes
@@ -295,6 +298,7 @@ impl Handler {
             }
         }
 
+        // Acknowledge response
         let response_options = json!({
             "type": 4,
             "data": {
