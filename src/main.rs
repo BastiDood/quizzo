@@ -1,10 +1,4 @@
-mod error;
-mod handler;
-mod model;
-
-use error::AppError;
-use handler::Handler;
-
+use quizzo::{AppError, Handler};
 use serenity::Client;
 use std::{env::var, num::NonZeroU64};
 use tokio::runtime::Builder;
