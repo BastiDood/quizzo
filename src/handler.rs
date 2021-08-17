@@ -1,14 +1,17 @@
-use crate::{error::SlashCommandError, model::Quiz};
+use crate::{
+    error::{AppError, SlashCommandError},
+    model::Quiz,
+};
 use hyper::{
     body::{to_bytes, Bytes},
     client::HttpConnector,
-    Client, Uri,
+    Client as HyperClient, Uri,
 };
 use hyper_rustls::HttpsConnector;
 use itertools::Itertools;
 use serde_json::{from_slice, json, Value};
 use serenity::{
-    client::{Context, EventHandler},
+    client::{ClientBuilder as SerenityClientBuilder, Context, EventHandler},
     http::Http,
     model::{
         interactions::{
@@ -25,69 +28,21 @@ use serenity::{
     },
 };
 use slab::Slab;
-use std::{
-    borrow::Cow,
-    collections::HashSet,
-    num::NonZeroU64,
-    sync::atomic::{AtomicU64, Ordering},
-    time::Duration,
-};
+use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, time::Duration};
 use tokio::{sync::Mutex, time::sleep};
 
 const START_COMMAND_NAME: &str = "start";
 const START_COMMAND_ARG: &str = "url";
 
 pub struct Handler {
-    http: Client<HttpsConnector<HttpConnector>>,
-    guild_id: Option<NonZeroU64>,
-    command_id: AtomicU64,
+    http: HyperClient<HttpsConnector<HttpConnector>>,
+    command_id: u64,
     quizzes: Mutex<Slab<(usize, HashSet<u64>)>>,
-}
-
-impl From<Option<NonZeroU64>> for Handler {
-    fn from(guild_id: Option<NonZeroU64>) -> Self {
-        let connector = HttpsConnector::with_webpki_roots();
-        let mut client = Client::builder();
-        client.http2_only(true);
-
-        Self {
-            guild_id,
-            http: client.build(connector),
-            command_id: Default::default(),
-            quizzes: Default::default(),
-        }
-    }
 }
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, _: Ready) {
-        println!("Registering commands...");
-        let start_command_opts = json!({
-            "name": START_COMMAND_NAME,
-            "description": "Start a new quiz.",
-            "options": [
-                {
-                    "type": 3,
-                    "name": START_COMMAND_ARG,
-                    "description": "The URL to which the JSON quiz is found.",
-                    "required": true,
-                }
-            ],
-        });
-
-        let maybe_command = if let Some(guild_id) = self.guild_id.map(NonZeroU64::get) {
-            ctx.http
-                .create_guild_application_command(guild_id, &start_command_opts)
-                .await
-        } else {
-            ctx.http
-                .create_global_application_command(&start_command_opts)
-                .await
-        };
-
-        let command = maybe_command.expect("cannot initialize guild command");
-        self.command_id.store(command.id.0, Ordering::Release);
+    async fn ready(&self, _: Context, _: Ready) {
         println!("Bot is ready!");
     }
 
@@ -104,9 +59,7 @@ impl EventHandler for Handler {
                         ..
                     },
                 ..
-            }) if name == START_COMMAND_NAME
-                && command_id.0 == self.command_id.load(Ordering::Acquire) =>
-            {
+            }) if name == START_COMMAND_NAME && command_id.0 == self.command_id => {
                 self.execute_start_command(&ctx.http, id.0, token.as_str(), options.as_slice())
                     .await
             }
@@ -160,6 +113,59 @@ impl EventHandler for Handler {
 }
 
 impl Handler {
+    pub async fn initialize(
+        token: &str,
+        application_id: u64,
+        guild_id: Option<NonZeroU64>,
+    ) -> Result<(), AppError> {
+        // Create rudimentary Discord API client for HTTP
+        let discord = Http::new_with_token_application_id(token, application_id);
+        let start_command_opts = json!({
+            "name": START_COMMAND_NAME,
+            "description": "Start a new quiz.",
+            "options": [
+                {
+                    "type": 3,
+                    "name": START_COMMAND_ARG,
+                    "description": "The URL to which the JSON quiz is found.",
+                    "required": true,
+                }
+            ],
+        });
+
+        // Register the slash command
+        println!("Registering commands...");
+        let maybe_command = if let Some(guild_id) = guild_id.map(NonZeroU64::get) {
+            discord
+                .create_guild_application_command(guild_id, &start_command_opts)
+                .await
+        } else {
+            discord
+                .create_global_application_command(&start_command_opts)
+                .await
+        };
+        let command_id = maybe_command?.id.0;
+
+        // Configure HTTP client for fetching JSON
+        let connector = HttpsConnector::with_webpki_roots();
+        let mut client = HyperClient::builder();
+        client.http2_only(true);
+
+        // Configure event handler client
+        let handler = Self {
+            http: client.build(connector),
+            quizzes: Default::default(),
+            command_id,
+        };
+
+        // Connect to Discord gateway
+        println!("Connecting to Discord gateway...");
+        let mut gateway = SerenityClientBuilder::new_with_http(discord)
+            .event_handler(handler)
+            .await?;
+        Ok(gateway.start().await?)
+    }
+
     async fn fetch(&self, uri: Uri) -> hyper::Result<Bytes> {
         let body = self.http.get(uri).await?.into_body();
         to_bytes(body).await
