@@ -28,8 +28,11 @@ use serenity::{
     },
 };
 use slab::Slab;
-use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, time::Duration};
-use tokio::{sync::Mutex, time::sleep};
+use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, sync::RwLock, time::Duration};
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    time::sleep,
+};
 
 const START_COMMAND_NAME: &str = "start";
 const START_COMMAND_ARG: &str = "url";
@@ -37,7 +40,7 @@ const START_COMMAND_ARG: &str = "url";
 pub struct Handler {
     http: HyperClient<HttpsConnector<HttpConnector>>,
     command_id: u64,
-    quizzes: Mutex<Slab<(usize, HashSet<u64>)>>,
+    quizzes: RwLock<Slab<UnboundedSender<(usize, u64)>>>,
 }
 
 #[serenity::async_trait]
@@ -207,10 +210,8 @@ impl Handler {
         }
 
         // Register the quiz
-        let quiz_id = {
-            let mut quizzes = self.quizzes.lock().await;
-            quizzes.insert((answer, Default::default()))
-        };
+        let (tx, mut rx) = unbounded_channel();
+        let quiz_id = self.quizzes.write().unwrap().insert(tx);
 
         // Respond to the user
         let component_options: Vec<_> = choices
@@ -247,17 +248,31 @@ impl Handler {
             .await?;
 
         // Execute the quiz
-        sleep(Duration::from_secs(timeout)).await;
-        let (_, tally) = {
-            let mut quizzes = self.quizzes.lock().await;
-            quizzes.remove(quiz_id)
-        };
+        let mut tally = HashSet::<u64>::new();
+        let deadline = sleep(Duration::from_secs(timeout));
+        tokio::pin!(deadline);
+        loop {
+            tokio::select! {
+                _ = &mut deadline => break,
+                Some((attempt, user_id)) = rx.recv() => {
+                    if attempt == answer {
+                        tally.insert(user_id);
+                    } else {
+                        tally.remove(&user_id);
+                    }
+                }
+            }
+        }
+
+        // Close channels
+        drop(self.quizzes.write().unwrap().remove(quiz_id));
+        drop(rx);
 
         // Count the tally
-        #[allow(unstable_name_collisions)]
         let mentions = if tally.is_empty() {
             Cow::Borrowed("Nobody got the correct answer...")
         } else {
+            #[allow(unstable_name_collisions)]
             let winners: String = tally
                 .iter()
                 .map(|id| Cow::Owned(format!("<@{}>", id)))
@@ -298,16 +313,25 @@ impl Handler {
             .ok_or(SlashCommandError::InvalidArgs)?;
 
         // Register user's answer
-        {
-            let mut quizzes = self.quizzes.lock().await;
-            let &mut (answer, ref mut tally) = quizzes
-                .get_mut(quiz_id)
-                .ok_or(SlashCommandError::InvalidArgs)?;
-            if choice == answer {
-                tally.insert(user_id);
-            } else {
-                tally.remove(&user_id);
-            }
+        let send_result = self
+            .quizzes
+            .read()
+            .unwrap()
+            .get(quiz_id)
+            .ok_or(SlashCommandError::InvalidArgs)?
+            .send((choice, user_id));
+        if let Err(_) = send_result {
+            // Acknowledge response
+            let response_options = json!({
+                "type": 4,
+                "data": {
+                    "content": "The quiz deadline has already passed.",
+                    "flags": 1 << 6,
+                },
+            });
+            ctx.create_interaction_response(id, token, &response_options)
+                .await?;
+            return Ok(());
         }
 
         // Acknowledge response
