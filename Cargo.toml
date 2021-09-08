@@ -43,4 +43,4 @@ features = ["client", "gateway", "model", "native_tls_backend", "unstable_discor
 [dependencies.tokio]
 version = "1.11"
 default-features = false
-features = ["rt", "macros", "sync", "time", "parking_lot"]
+features = ["rt-multi-thread", "macros", "sync", "time", "parking_lot"]

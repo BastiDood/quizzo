@@ -14,6 +14,6 @@ fn main() -> Result<(), AppError> {
         .and_then(NonZeroU64::new);
 
     // Launch Tokio async runtime
-    let runtime = Builder::new_current_thread().enable_all().build()?;
+    let runtime = Builder::new_multi_thread().enable_all().build()?;
     runtime.block_on(Handler::initialize(&bot_token, application_id, guild_id))
 }
