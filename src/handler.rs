@@ -151,7 +151,7 @@ impl Handler {
         let command_id = maybe_command?.id.0;
 
         // Configure HTTP client for fetching JSON
-        let connector = HttpsConnector::with_webpki_roots();
+        let connector = HttpsConnector::with_native_roots();
         let mut client = HyperClient::builder();
         client.http2_only(true);
 
