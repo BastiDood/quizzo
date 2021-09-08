@@ -9,6 +9,7 @@ use hyper::{
 };
 use hyper_rustls::HttpsConnector;
 use itertools::Itertools;
+use parking_lot::{const_rwlock, RwLock};
 use serde_json::{from_slice, json, Value};
 use serenity::{
     client::{ClientBuilder as SerenityClientBuilder, Context, EventHandler},
@@ -28,7 +29,7 @@ use serenity::{
     },
 };
 use slab::Slab;
-use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, sync::RwLock, time::Duration};
+use std::{borrow::Cow, collections::HashSet, num::NonZeroU64, time::Duration};
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     time::sleep,
@@ -157,7 +158,7 @@ impl Handler {
         // Configure event handler client
         let handler = Self {
             http: client.build(connector),
-            quizzes: Default::default(),
+            quizzes: const_rwlock(Default::default()),
             command_id,
         };
 
@@ -211,7 +212,7 @@ impl Handler {
 
         // Register the quiz
         let (tx, mut rx) = unbounded_channel();
-        let quiz_id = self.quizzes.write().unwrap().insert(tx);
+        let quiz_id = self.quizzes.write().insert(tx);
 
         // Respond to the user
         let component_options: Vec<_> = choices
@@ -265,7 +266,7 @@ impl Handler {
         }
 
         // Close channels
-        drop(self.quizzes.write().unwrap().remove(quiz_id));
+        drop(self.quizzes.write().remove(quiz_id));
         drop(rx);
 
         // Count the tally
@@ -316,7 +317,6 @@ impl Handler {
         let send_result = self
             .quizzes
             .read()
-            .unwrap()
             .get(quiz_id)
             .ok_or(SlashCommandError::InvalidArgs)?
             .send((choice, user_id));
