@@ -4,43 +4,7 @@ version = "0.2.0"
 edition = "2018"
 resolver = "2"
 
-[dependencies.hyper]
-version = "0.14"
-default-features = false
-features = ["client", "http2"]
-
-[dependencies.hyper-rustls]
-version = "0.22"
-default-features = false
-features = ["native-tokio"]
-
-[dependencies.itertools]
-version = "0.10"
-default-features = false
-
-[dependencies.parking_lot]
-version = "0.11"
-default-features = false
-
-[dependencies.slab]
-version = "0.4"
-default-features = false
-
-[dependencies.serde]
-version = "1.0"
-default-features = false
-features = ["derive"]
-
-[dependencies.serde_json]
-version = "1.0"
-default-features = false
-
-[dependencies.serenity]
-version = "0.10"
-default-features = false
-features = ["client", "gateway", "model", "native_tls_backend", "unstable_discord_api"]
-
 [dependencies.tokio]
 version = "1.11"
 default-features = false
-features = ["rt-multi-thread", "macros", "sync", "time", "parking_lot"]
+features = ["rt"]

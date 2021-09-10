@@ -1,6 +1,27 @@
-use quizzo::{AppError, Handler};
-use std::{env::var, num::NonZeroU64};
+use std::{
+    env::{var, VarError},
+    io::Error as IoError,
+    num::NonZeroU64,
+};
 use tokio::runtime::Builder;
+
+#[derive(Debug)]
+enum AppError {
+    MissingEnvVars,
+    Io(IoError),
+}
+
+impl From<VarError> for AppError {
+    fn from(_: VarError) -> Self {
+        Self::MissingEnvVars
+    }
+}
+
+impl From<IoError> for AppError {
+    fn from(err: IoError) -> Self {
+        Self::Io(err)
+    }
+}
 
 fn main() -> Result<(), AppError> {
     // Retrieve environment variables
@@ -14,6 +35,6 @@ fn main() -> Result<(), AppError> {
         .and_then(NonZeroU64::new);
 
     // Launch Tokio async runtime
-    let runtime = Builder::new_multi_thread().enable_all().build()?;
-    runtime.block_on(Handler::initialize(&bot_token, application_id, guild_id))
+    let runtime = Builder::new_current_thread().enable_all().build()?;
+    Ok(())
 }
