@@ -4,6 +4,11 @@ version = "0.2.0"
 edition = "2018"
 resolver = "2"
 
+[dependencies.hyper]
+version = "0.14"
+default-features = false
+features = ["server", "tcp", "http1"]
+
 [dependencies.tokio]
 version = "1.11"
 default-features = false
