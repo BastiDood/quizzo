@@ -4,6 +4,16 @@ version = "0.2.0"
 edition = "2018"
 resolver = "2"
 
+[dependencies.ed25519-dalek]
+version = "1.0"
+default-features = false
+features = ["u64_backend"]
+
+[dependencies.hex]
+version = "0.4"
+default-features = false
+features = ["alloc"]
+
 [dependencies.hyper]
 version = "0.14"
 default-features = false
