@@ -1,85 +1,17 @@
 use hyper::{
-    body::{self, Bytes, HttpBody},
     service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, StatusCode, {Error as HyperError, Server},
+    Body, Response, Server,
 };
+use quizzo::{validate_request, AppError};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,
-    env::{self, VarError},
-    future,
-    io::Error as IoError,
+    env, future,
     net::{Ipv4Addr, TcpListener},
     num::NonZeroU64,
     sync::Arc,
 };
 use tokio::runtime::Builder;
-
-#[derive(Debug)]
-enum AppError {
-    MissingEnvVars,
-    MalformedEnvVars,
-    Hyper(HyperError),
-    Io(IoError),
-}
-
-impl From<VarError> for AppError {
-    fn from(_: VarError) -> Self {
-        Self::MissingEnvVars
-    }
-}
-
-impl From<IoError> for AppError {
-    fn from(err: IoError) -> Self {
-        Self::Io(err)
-    }
-}
-
-impl From<HyperError> for AppError {
-    fn from(err: HyperError) -> Self {
-        Self::Hyper(err)
-    }
-}
-
-async fn validate_request<T: AsRef<[u8]>, B: HttpBody>(
-    req: Request<B>,
-    pub_key: &UnparsedPublicKey<T>,
-) -> Result<Bytes, StatusCode> {
-    // Disallow non-POST methods and unexpected paths
-    if req.method() != Method::POST || req.uri().path() != "/" {
-        return Err(StatusCode::NOT_FOUND);
-    }
-
-    // Check existence of signatures
-    let signature = req
-        .headers()
-        .get("X-Signature-Ed25519")
-        .ok_or(StatusCode::BAD_REQUEST)?
-        .to_str()
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    let mut message = req
-        .headers()
-        .get("X-Signature-Timestamp")
-        .ok_or(StatusCode::BAD_REQUEST)?
-        .to_str()
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .as_bytes()
-        .to_vec();
-    if signature.is_empty() || message.is_empty() {
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    // Verify signatures
-    let signature = hex::decode(signature).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let body = body::to_bytes(req.into_body())
-        .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    message.extend_from_slice(&body);
-    pub_key
-        .verify(&message, &signature)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
-    Ok(body)
-}
 
 fn main() -> Result<(), AppError> {
     // Try to parse public key
