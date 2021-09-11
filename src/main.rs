@@ -1,7 +1,7 @@
 use hyper::{
-    body,
+    body::{self, Bytes, HttpBody},
     service::{make_service_fn, service_fn},
-    Body, Method, Response, StatusCode, {Error as HyperError, Server},
+    Body, Method, Request, Response, StatusCode, {Error as HyperError, Server},
 };
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
@@ -18,7 +18,7 @@ use tokio::runtime::Builder;
 #[derive(Debug)]
 enum AppError {
     MissingEnvVars,
-    InvalidPublicKey,
+    MalformedEnvVars,
     Hyper(HyperError),
     Io(IoError),
 }
@@ -41,23 +41,63 @@ impl From<HyperError> for AppError {
     }
 }
 
+async fn validate_request<T: AsRef<[u8]>, B: HttpBody>(
+    req: Request<B>,
+    pub_key: &UnparsedPublicKey<T>,
+) -> Result<Bytes, StatusCode> {
+    // Disallow non-POST methods and unexpected paths
+    if req.method() != Method::POST || req.uri().path() != "/" {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Check existence of signatures
+    let signature = req
+        .headers()
+        .get("X-Signature-Ed25519")
+        .ok_or(StatusCode::BAD_REQUEST)?
+        .to_str()
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let mut message = req
+        .headers()
+        .get("X-Signature-Timestamp")
+        .ok_or(StatusCode::BAD_REQUEST)?
+        .to_str()
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+        .as_bytes()
+        .to_vec();
+    if signature.is_empty() || message.is_empty() {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    // Verify signatures
+    let signature = hex::decode(signature).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let body = body::to_bytes(req.into_body())
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    message.extend_from_slice(&body);
+    pub_key
+        .verify(&message, &signature)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    Ok(body)
+}
+
 fn main() -> Result<(), AppError> {
-    // Retrieve environment variables
+    // Try to parse public key
+    let public_key = env::var("PUBLIC_KEY")?;
+    let pub_bytes: Arc<[u8]> = hex::decode(public_key)
+        .map_err(|_| AppError::MalformedEnvVars)?
+        .into();
+    let pub_key = UnparsedPublicKey::new(&ED25519, pub_bytes);
+
+    // Retrieve other environment variables
     let port = env::var("PORT")?
         .parse()
-        .map_err(|_| AppError::MissingEnvVars)?;
-    let bot_token = env::var("BOT_TOKEN")?;
+        .map_err(|_| AppError::MalformedEnvVars)?;
     let application_id = env::var("APPLICATION_ID")?;
     let guild_id = env::var("GUILD_ID")?
         .parse::<u64>()
         .ok()
         .and_then(NonZeroU64::new);
-
-    // Try to parse public key
-    let pub_bytes: Arc<[u8]> = hex::decode(application_id)
-        .map_err(|_| AppError::InvalidPublicKey)?
-        .into();
-    let pub_key = UnparsedPublicKey::new(&ED25519, pub_bytes);
 
     // Configure main service
     let service = make_service_fn(move |_| {
@@ -65,65 +105,15 @@ fn main() -> Result<(), AppError> {
         let outer = service_fn(move |req| {
             let inner_pub_key = outer_pub_key.clone();
             async move {
-                // Disallow non-POST methods
-                if req.method() != Method::POST {
-                    let mut res = Response::new(Body::empty());
-                    *res.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
-                    return Ok(res);
-                }
-
-                // Disallow any other route
-                if req.uri().path() != "/" {
-                    let mut res = Response::new(Body::empty());
-                    *res.status_mut() = StatusCode::NOT_FOUND;
-                    return Ok(res);
-                }
-
-                // Check existence of signatures
-                let signature = req
-                    .headers()
-                    .get("X-Signature-Ed25519")
-                    .and_then(|sig| sig.to_str().ok())
-                    .unwrap_or_default();
-                let timestamp = req
-                    .headers()
-                    .get("X-Signature-Timestamp")
-                    .and_then(|ts| ts.to_str().ok())
-                    .unwrap_or_default();
-                if signature.is_empty() || timestamp.is_empty() {
-                    let mut res = Response::new(Body::empty());
-                    *res.status_mut() = StatusCode::UNAUTHORIZED;
-                    return Ok(res);
-                }
-
-                // Convert hex strings to bytes
-                let signature = match hex::decode(signature) {
-                    Ok(sig) => sig,
-                    _ => {
-                        let mut res = Response::new(Body::empty());
-                        *res.status_mut() = StatusCode::BAD_REQUEST;
+                let body = match validate_request(req, &inner_pub_key).await {
+                    Ok(body) => body,
+                    Err(code) => {
+                        let mut res = Response::<Body>::default();
+                        *res.status_mut() = code;
                         return Ok(res);
                     }
                 };
-                let mut timestamp = match hex::decode(timestamp) {
-                    Ok(ts) => ts,
-                    _ => {
-                        let mut res = Response::new(Body::empty());
-                        *res.status_mut() = StatusCode::BAD_REQUEST;
-                        return Ok(res);
-                    }
-                };
-
-                // Verify signatures
-                let body = body::to_bytes(req.into_body()).await?;
-                timestamp.extend_from_slice(&body);
-                if let Err(_) = inner_pub_key.verify(&timestamp, &signature) {
-                    let mut res = Response::new(Body::empty());
-                    *res.status_mut() = StatusCode::UNAUTHORIZED;
-                    return Ok(res);
-                }
-
-                Ok::<_, HyperError>(Response::new(Body::empty()))
+                Ok::<_, Infallible>(Response::new(Body::empty()))
             }
         });
         future::ready(Ok::<_, Infallible>(outer))
