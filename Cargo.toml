@@ -18,6 +18,15 @@ version = "0.14"
 default-features = false
 features = ["server", "tcp", "http1"]
 
+[dependencies.serde]
+version = "1"
+default-features = false
+
+[dependencies.serde_json]
+version = "1"
+default-features = false
+features = ["alloc"]
+
 [dependencies.tokio]
 version = "1.11"
 default-features = false
