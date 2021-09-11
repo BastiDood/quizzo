@@ -4,10 +4,9 @@ version = "0.2.0"
 edition = "2018"
 resolver = "2"
 
-[dependencies.ed25519-dalek]
-version = "1.0"
+[dependencies.ring]
+version = "0.16"
 default-features = false
-features = ["u64_backend"]
 
 [dependencies.hex]
 version = "0.4"

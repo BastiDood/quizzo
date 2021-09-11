@@ -1,22 +1,24 @@
-use ed25519_dalek::{PublicKey, Signature, Verifier};
 use hyper::{
     body,
     service::{make_service_fn, service_fn},
     Body, Method, Response, StatusCode, {Error as HyperError, Server},
 };
+use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
-    convert::{Infallible, TryInto},
+    convert::Infallible,
     env::{self, VarError},
     future,
     io::Error as IoError,
     net::{Ipv4Addr, TcpListener},
     num::NonZeroU64,
+    sync::Arc,
 };
 use tokio::runtime::Builder;
 
 #[derive(Debug)]
 enum AppError {
     MissingEnvVars,
+    InvalidPublicKey,
     Hyper(HyperError),
     Io(IoError),
 }
@@ -51,13 +53,17 @@ fn main() -> Result<(), AppError> {
         .ok()
         .and_then(NonZeroU64::new);
 
-    // Cache the public key
-    let pub_bytes = hex::decode(application_id).map_err(|_| AppError::MissingEnvVars)?;
-    let pub_key = PublicKey::from_bytes(&pub_bytes).map_err(|_| AppError::MissingEnvVars)?;
+    // Try to parse public key
+    let pub_bytes: Arc<[u8]> = hex::decode(application_id)
+        .map_err(|_| AppError::InvalidPublicKey)?
+        .into();
+    let pub_key = UnparsedPublicKey::new(&ED25519, pub_bytes);
 
     // Configure main service
     let service = make_service_fn(move |_| {
+        let outer_pub_key = pub_key.clone();
         let outer = service_fn(move |req| {
+            let inner_pub_key = outer_pub_key.clone();
             async move {
                 // Disallow non-POST methods
                 if req.method() != Method::POST {
@@ -91,10 +97,16 @@ fn main() -> Result<(), AppError> {
                 }
 
                 // Convert hex strings to bytes
-                let sig = hex::decode(signature).ok();
-                let ts = hex::decode(timestamp).ok();
-                let (signature, mut timestamp) = match sig.zip(ts) {
-                    Some(pair) => pair,
+                let signature = match hex::decode(signature) {
+                    Ok(sig) => sig,
+                    _ => {
+                        let mut res = Response::new(Body::empty());
+                        *res.status_mut() = StatusCode::BAD_REQUEST;
+                        return Ok(res);
+                    }
+                };
+                let mut timestamp = match hex::decode(timestamp) {
+                    Ok(ts) => ts,
                     _ => {
                         let mut res = Response::new(Body::empty());
                         *res.status_mut() = StatusCode::BAD_REQUEST;
@@ -103,10 +115,13 @@ fn main() -> Result<(), AppError> {
                 };
 
                 // Verify signatures
-                let signature: Signature = signature.as_slice().try_into().unwrap();
                 let body = body::to_bytes(req.into_body()).await?;
                 timestamp.extend_from_slice(&body);
-                pub_key.verify(&timestamp, &signature).unwrap();
+                if let Err(_) = inner_pub_key.verify(&timestamp, &signature) {
+                    let mut res = Response::new(Body::empty());
+                    *res.status_mut() = StatusCode::UNAUTHORIZED;
+                    return Ok(res);
+                }
 
                 Ok::<_, HyperError>(Response::new(Body::empty()))
             }
