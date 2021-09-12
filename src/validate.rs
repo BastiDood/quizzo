@@ -5,10 +5,7 @@ use hyper::{
 };
 use ring::signature::UnparsedPublicKey;
 
-pub async fn validate_request<P, B>(
-    req: Request<B>,
-    pub_key: &UnparsedPublicKey<P>,
-) -> Result<Bytes, StatusCode>
+pub async fn validate_request<P, B>(req: Request<B>, pub_key: &UnparsedPublicKey<P>) -> Result<Bytes, StatusCode>
 where
     P: AsRef<[u8]>,
     B: HttpBody,

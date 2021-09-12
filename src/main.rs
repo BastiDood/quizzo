@@ -16,20 +16,13 @@ use tokio::runtime::Builder;
 fn main() -> Result<(), AppError> {
     // Try to parse public key
     let public_key = env::var("PUBLIC_KEY")?;
-    let pub_bytes: Arc<[u8]> = hex::decode(public_key)
-        .map_err(|_| AppError::MalformedEnvVars)?
-        .into();
+    let pub_bytes: Arc<[u8]> = hex::decode(public_key).map_err(|_| AppError::MalformedEnvVars)?.into();
     let pub_key = UnparsedPublicKey::new(&ED25519, pub_bytes);
 
     // Retrieve other environment variables
-    let port = env::var("PORT")?
-        .parse()
-        .map_err(|_| AppError::MalformedEnvVars)?;
+    let port = env::var("PORT")?.parse().map_err(|_| AppError::MalformedEnvVars)?;
     let application_id = env::var("APPLICATION_ID")?;
-    let guild_id = env::var("GUILD_ID")?
-        .parse::<u64>()
-        .ok()
-        .and_then(NonZeroU64::new);
+    let guild_id = env::var("GUILD_ID")?.parse::<u64>().ok().and_then(NonZeroU64::new);
 
     // Configure main service
     let service = make_service_fn(move |_| {
@@ -57,9 +50,6 @@ fn main() -> Result<(), AppError> {
     let server = Server::from_tcp(tcp)?.http1_only(true).serve(service);
 
     // Launch Tokio async runtime
-    Builder::new_current_thread()
-        .enable_io()
-        .build()?
-        .block_on(server)?;
+    Builder::new_current_thread().enable_io().build()?.block_on(server)?;
     Ok(())
 }
