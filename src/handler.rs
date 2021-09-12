@@ -1,15 +1,20 @@
 //! # Panic
 //! Must be called in a Tokio context.
 
-use crate::model::{Interaction, InteractionData};
+use crate::{
+    http::Fetcher,
+    model::{Interaction, InteractionData},
+};
 use parking_lot::RwLock;
 use slab::Slab;
 use tokio::sync::mpsc::UnboundedSender;
 
 type AnswerAndUser = (usize, u64);
+type PendingQuiz = UnboundedSender<AnswerAndUser>;
 
 pub struct Handler {
-    quiz_channels: RwLock<Slab<UnboundedSender<AnswerAndUser>>>,
+    client: Fetcher,
+    quiz_channels: RwLock<Slab<PendingQuiz>>,
 }
 
 impl Handler {

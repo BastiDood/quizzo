@@ -1,5 +1,6 @@
 mod error;
 mod handler;
+mod http;
 mod validate;
 
 pub mod model;

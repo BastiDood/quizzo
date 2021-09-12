@@ -4,6 +4,9 @@ version = "0.2.0"
 edition = "2018"
 resolver = "2"
 
+[dependencies]
+hyper-tls = "0.5"
+
 [dependencies.ring]
 version = "0.16"
 default-features = false
@@ -16,7 +19,7 @@ features = ["alloc"]
 [dependencies.hyper]
 version = "0.14"
 default-features = false
-features = ["server", "tcp", "http1"]
+features = ["server", "client", "tcp", "http1"]
 
 [dependencies.parking_lot]
 version = "0.11"
