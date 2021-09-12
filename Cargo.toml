@@ -18,6 +18,14 @@ version = "0.14"
 default-features = false
 features = ["server", "tcp", "http1"]
 
+[dependencies.parking_lot]
+version = "0.11"
+default-features = false
+
+[dependencies.slab]
+version = "0.4"
+default-features = false
+
 [dependencies.serde]
 version = "1"
 features = ["derive"]
@@ -30,4 +38,4 @@ features = ["alloc"]
 [dependencies.tokio]
 version = "1.11"
 default-features = false
-features = ["rt"]
+features = ["rt", "sync", "parking_lot"]

@@ -4,34 +4,34 @@ use serde::{
 };
 use std::{collections::HashMap, num::NonZeroU64};
 
-pub struct Interaction {
+pub struct Interaction<'txt> {
     pub interaction_id: NonZeroU64,
     pub application_id: NonZeroU64,
     pub user_id: NonZeroU64,
-    pub data: InteractionData,
-    pub token: Box<str>,
+    pub data: InteractionData<'txt>,
+    pub token: &'txt str,
 }
 
-pub enum InteractionData {
+pub enum InteractionData<'txt> {
     Ping,
     AppCommand {
         command_id: NonZeroU64,
-        name: Box<str>,
-        url: Box<str>,
+        name: &'txt str,
+        url: &'txt str,
     },
     SelectMenu {
-        custom_id: Box<str>,
-        selection: Box<str>,
+        custom_id: &'txt str,
+        selection: &'txt str,
     },
 }
 
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum DiscordField<'a> {
+enum DiscordField<'txt> {
     Num(NonZeroU64),
-    Str(&'a str),
+    Str(&'txt str),
     Seq(Box<[Self]>),
-    Map(HashMap<Box<str>, Self>),
+    Map(HashMap<&'txt str, Self>),
 }
 
 impl<'a> DiscordField<'a> {
@@ -57,7 +57,7 @@ impl<'a> DiscordField<'a> {
     }
 }
 
-impl<'de> Deserialize<'de> for Interaction {
+impl<'de> Deserialize<'de> for Interaction<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -65,7 +65,7 @@ impl<'de> Deserialize<'de> for Interaction {
         struct InteractionVisitor;
 
         impl<'de> Visitor<'de> for InteractionVisitor {
-            type Value = Interaction;
+            type Value = Interaction<'de>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(formatter, "a valid value from Discord")
@@ -79,8 +79,8 @@ impl<'de> Deserialize<'de> for Interaction {
                 let mut interaction_id = None::<NonZeroU64>;
                 let mut application_id = None::<NonZeroU64>;
                 let mut user_id = None::<NonZeroU64>;
-                let mut token = None::<Box<str>>;
-                let mut data = None::<HashMap<Box<str>, DiscordField>>;
+                let mut token = None::<&str>;
+                let mut data = None::<HashMap<&str, DiscordField>>;
                 let mut data_type = None::<NonZeroU64>;
 
                 // Check for correct key-value pairs
@@ -95,7 +95,7 @@ impl<'de> Deserialize<'de> for Interaction {
                             continue;
                         }
                         ("token", DiscordField::Str(tok)) => {
-                            token = Some(tok.into());
+                            token = Some(tok);
                             continue;
                         }
                         ("type", DiscordField::Num(interaction_type)) => {
@@ -139,15 +139,14 @@ impl<'de> Deserialize<'de> for Interaction {
                             .remove("options")
                             .and_then(DiscordField::into_seq)
                             .ok_or(de::Error::missing_field("data.options"))?;
-                        let url: Box<str> = match *options {
-                            [DiscordField::Str(first), ..] => first.into(),
+                        let url = match *options {
+                            [DiscordField::Str(first), ..] => first,
                             _ => return Err(de::Error::invalid_length(0, &"non-empty")),
                         };
-                        let name: Box<str> = interaction_data
+                        let name = interaction_data
                             .remove("name")
                             .and_then(DiscordField::into_str)
-                            .ok_or(de::Error::missing_field("data.name"))?
-                            .into();
+                            .ok_or(de::Error::missing_field("data.name"))?;
                         let command_id = interaction_data
                             .remove("id")
                             .and_then(DiscordField::into_snowflake)
@@ -169,15 +168,14 @@ impl<'de> Deserialize<'de> for Interaction {
                             .remove("values")
                             .and_then(DiscordField::into_seq)
                             .ok_or(de::Error::missing_field("data.values"))?;
-                        let selection: Box<str> = match *values {
-                            [DiscordField::Str(first), ..] => first.into(),
+                        let selection = match *values {
+                            [DiscordField::Str(first), ..] => first,
                             _ => return Err(de::Error::invalid_length(0, &"non-empty")),
                         };
                         let custom_id = interaction_data
                             .remove("custom_id")
                             .and_then(DiscordField::into_str)
-                            .ok_or(de::Error::missing_field("data.custom_id"))?
-                            .into();
+                            .ok_or(de::Error::missing_field("data.custom_id"))?;
                         InteractionData::SelectMenu { custom_id, selection }
                     }
                     _ => return Err(de::Error::unknown_variant("UNKNOWN", &EXPECTED_INTERACTION_TYPES)),
