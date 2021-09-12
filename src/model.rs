@@ -1,13 +1,13 @@
 use serde::{
-    de::{Error, Unexpected},
+    de::{self, MapAccess, Visitor},
     Deserialize, Deserializer,
 };
-use serde_json::{Map, Value};
+use std::{collections::HashMap, num::NonZeroU64};
 
 pub struct Interaction {
-    pub interaction_id: u64,
-    pub application_id: u64,
-    pub user_id: u64,
+    pub interaction_id: NonZeroU64,
+    pub application_id: NonZeroU64,
+    pub user_id: NonZeroU64,
     pub data: InteractionData,
     pub token: Box<str>,
 }
@@ -15,7 +15,7 @@ pub struct Interaction {
 pub enum InteractionData {
     Ping,
     AppCommand {
-        command_id: u64,
+        command_id: NonZeroU64,
         name: Box<str>,
         url: Box<str>,
     },
@@ -25,158 +25,175 @@ pub enum InteractionData {
     },
 }
 
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DiscordField<'a> {
+    Num(NonZeroU64),
+    Str(&'a str),
+    Seq(Box<[Self]>),
+    Map(HashMap<Box<str>, Self>),
+}
+
+impl<'a> DiscordField<'a> {
+    fn into_snowflake(self) -> Option<NonZeroU64> {
+        match self {
+            Self::Num(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    fn into_str(self) -> Option<&'a str> {
+        match self {
+            Self::Str(inner) => Some(inner),
+            _ => None,
+        }
+    }
+
+    fn into_seq(self) -> Option<Box<[Self]>> {
+        match self {
+            Self::Seq(inner) => Some(inner),
+            _ => None,
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for Interaction {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        // Parse metadata at the interaction-level
-        let mut map = Map::deserialize(deserializer)?;
-        let interaction_id = map
-            .get("id")
-            .and_then(Value::as_u64)
-            .ok_or(D::Error::missing_field("interaction id"))?;
-        let application_id = map
-            .get("application_id")
-            .and_then(Value::as_u64)
-            .ok_or(D::Error::missing_field("application id"))?;
+        struct InteractionVisitor;
 
-        // Parse interaction token
-        let maybe_token = map
-            .remove("token")
-            .ok_or(D::Error::missing_field("interaction token"))?;
-        let token = match maybe_token {
-            Value::String(text) => text.into_boxed_str(),
-            _ => {
-                return Err(D::Error::invalid_type(
-                    Unexpected::Other("non-string token"),
-                    &"string token",
-                ))
+        impl<'de> Visitor<'de> for InteractionVisitor {
+            type Value = Interaction;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a valid value from Discord")
             }
-        };
 
-        // Parse the user ID
-        let user_id = map
-            .get("member")
-            .and_then(|member| member.as_object()?.get("user"))
-            .xor(map.get("user"))
-            .and_then(|user| user.as_object()?.get("id")?.as_u64())
-            .ok_or(D::Error::missing_field("user id"))?;
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                // Initialize expected fields
+                let mut interaction_id = None::<NonZeroU64>;
+                let mut application_id = None::<NonZeroU64>;
+                let mut user_id = None::<NonZeroU64>;
+                let mut token = None::<Box<str>>;
+                let mut data = None::<HashMap<Box<str>, DiscordField>>;
+                let mut data_type = None::<NonZeroU64>;
 
-        // Resolve data union
-        let interaction_type = map
-            .get("type")
-            .and_then(Value::as_u64)
-            .ok_or(D::Error::missing_field("interaction type"))?;
-        let data = match interaction_type {
-            1 => InteractionData::Ping,
-            2 => {
-                let data = map
-                    .get_mut("data")
-                    .and_then(Value::as_object_mut)
-                    .ok_or(D::Error::missing_field("data"))?;
-                let command_id = data
-                    .get("id")
-                    .and_then(Value::as_u64)
-                    .ok_or(D::Error::missing_field("command id"))?;
-                let maybe_name = data
-                    .remove("name")
-                    .ok_or(D::Error::missing_field("command name"))?;
-                let name = match maybe_name {
-                    Value::String(text) => text.into_boxed_str(),
-                    _ => {
-                        return Err(D::Error::invalid_type(
-                            Unexpected::Other("non-string token"),
-                            &"string token",
-                        ))
-                    }
-                };
-
-                let argument = data
-                    .get_mut("options")
-                    .and_then(|val| val.as_array_mut()?.first_mut()?.as_object_mut())
-                    .ok_or(D::Error::missing_field("command argument for url"))?;
-                let arg_name = argument
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                if arg_name != "url" {
-                    return Err(D::Error::invalid_value(Unexpected::Str(arg_name), &"url"));
+                // Check for correct key-value pairs
+                while let Some(pair) = map.next_entry()? {
+                    let mut user = match pair {
+                        ("id", DiscordField::Num(id)) => {
+                            interaction_id = Some(id);
+                            continue;
+                        }
+                        ("application_id", DiscordField::Num(id)) => {
+                            application_id = Some(id);
+                            continue;
+                        }
+                        ("token", DiscordField::Str(tok)) => {
+                            token = Some(tok.into());
+                            continue;
+                        }
+                        ("type", DiscordField::Num(interaction_type)) => {
+                            data_type = Some(interaction_type);
+                            continue;
+                        }
+                        ("data", DiscordField::Map(interaction_data)) => {
+                            data = Some(interaction_data);
+                            continue;
+                        }
+                        ("user", DiscordField::Map(user)) => user,
+                        ("member", DiscordField::Map(mut member)) => {
+                            if let Some(DiscordField::Map(user)) = member.remove("user") {
+                                user
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
+                    user_id = user.remove("id").and_then(DiscordField::into_snowflake);
                 }
 
-                let maybe_url = argument
-                    .remove("value")
-                    .ok_or(D::Error::missing_field("argument value"))?;
-                let url = match maybe_url {
-                    Value::String(text) => text.into_boxed_str(),
-                    _ => {
-                        return Err(D::Error::invalid_type(
-                            Unexpected::Other("non-string token"),
-                            &"string token",
-                        ))
+                // Deserialize interaction data
+                const EXPECTED_INTERACTION_TYPES: [&str; 3] = ["PING", "APPLICATION_COMMAND", "MESSAGE_COMPONENT"];
+                let interaction_type = data_type.ok_or(de::Error::missing_field("type"))?.get();
+                let mut interaction_data = data.ok_or(de::Error::missing_field("data"))?;
+                let data = match interaction_type {
+                    1 => InteractionData::Ping,
+                    2 => {
+                        let command_type = match interaction_data.remove("type").and_then(DiscordField::into_snowflake)
+                        {
+                            Some(val) => val.get(),
+                            _ => 0,
+                        };
+                        if command_type != 1 {
+                            return Err(de::Error::unknown_variant("USER or MESSAGE", &["CHAT_INPUT"]));
+                        }
+
+                        let options = interaction_data
+                            .remove("options")
+                            .and_then(DiscordField::into_seq)
+                            .ok_or(de::Error::missing_field("data.options"))?;
+                        let url: Box<str> = match *options {
+                            [DiscordField::Str(first), ..] => first.into(),
+                            _ => return Err(de::Error::invalid_length(0, &"non-empty")),
+                        };
+                        let name: Box<str> = interaction_data
+                            .remove("name")
+                            .and_then(DiscordField::into_str)
+                            .ok_or(de::Error::missing_field("data.name"))?
+                            .into();
+                        let command_id = interaction_data
+                            .remove("id")
+                            .and_then(DiscordField::into_snowflake)
+                            .ok_or(de::Error::missing_field("data.id"))?;
+
+                        InteractionData::AppCommand { command_id, name, url }
                     }
+                    3 => {
+                        let component_type = interaction_data
+                            .remove("component_type")
+                            .and_then(DiscordField::into_snowflake)
+                            .ok_or(de::Error::missing_field("data.component_type"))?
+                            .get();
+                        if component_type != 3 {
+                            return Err(de::Error::unknown_variant("ACTION_ROW or BUTTON", &["SELECT_MENU"]));
+                        }
+
+                        let values = interaction_data
+                            .remove("values")
+                            .and_then(DiscordField::into_seq)
+                            .ok_or(de::Error::missing_field("data.values"))?;
+                        let selection: Box<str> = match *values {
+                            [DiscordField::Str(first), ..] => first.into(),
+                            _ => return Err(de::Error::invalid_length(0, &"non-empty")),
+                        };
+                        let custom_id = interaction_data
+                            .remove("custom_id")
+                            .and_then(DiscordField::into_str)
+                            .ok_or(de::Error::missing_field("data.custom_id"))?
+                            .into();
+                        InteractionData::SelectMenu { custom_id, selection }
+                    }
+                    _ => return Err(de::Error::unknown_variant("UNKNOWN", &EXPECTED_INTERACTION_TYPES)),
                 };
 
-                InteractionData::AppCommand {
-                    command_id,
-                    name,
-                    url,
-                }
+                Ok(Interaction {
+                    interaction_id: interaction_id.ok_or(de::Error::missing_field("id"))?,
+                    application_id: application_id.ok_or(de::Error::missing_field("application_id"))?,
+                    user_id: user_id.ok_or(de::Error::missing_field("user.id or member.user.id"))?,
+                    token: token.ok_or(de::Error::missing_field("token"))?,
+                    data,
+                })
             }
-            3 => {
-                let data = map
-                    .get_mut("data")
-                    .and_then(Value::as_object_mut)
-                    .ok_or(D::Error::missing_field("data"))?;
-                let values = data
-                    .get_mut("values")
-                    .and_then(Value::as_array_mut)
-                    .ok_or(D::Error::missing_field("url parameter"))?;
-                if values.is_empty() {
-                    return Err(D::Error::invalid_length(0, &"non-empty values"));
-                }
+        }
 
-                let selection = match values.swap_remove(0) {
-                    Value::String(text) => text.into_boxed_str(),
-                    _ => {
-                        return Err(D::Error::invalid_type(
-                            Unexpected::Other("non-string selection"),
-                            &"string selection",
-                        ))
-                    }
-                };
-                let maybe_custom_id = data
-                    .remove("id")
-                    .ok_or(D::Error::missing_field("custom id"))?;
-                let custom_id = match maybe_custom_id {
-                    Value::String(text) => text.into_boxed_str(),
-                    _ => {
-                        return Err(D::Error::invalid_type(
-                            Unexpected::Other("non-string selection"),
-                            &"string selection",
-                        ))
-                    }
-                };
-
-                InteractionData::SelectMenu {
-                    custom_id,
-                    selection,
-                }
-            }
-            _ => {
-                return Err(D::Error::invalid_value(
-                    Unexpected::Other("unsupported interaction type"),
-                    &"valid interaction type",
-                ))
-            }
-        };
-
-        Ok(Self {
-            interaction_id,
-            application_id,
-            user_id,
-            token,
-            data,
-        })
+        const FIELDS: [&str; 6] = ["id", "application_id", "type", "data", "member", "user"];
+        deserializer.deserialize_struct("Interaction", &FIELDS, InteractionVisitor)
     }
 }

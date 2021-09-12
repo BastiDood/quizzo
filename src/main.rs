@@ -2,7 +2,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
 };
-use quizzo::{validate_request, AppError};
+use quizzo::{model::Interaction, validate_request, AppError};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,
@@ -45,6 +45,7 @@ fn main() -> Result<(), AppError> {
                         return Ok(res);
                     }
                 };
+                let interaction: Interaction = serde_json::from_slice(&body).unwrap();
                 Ok::<_, Infallible>(Response::new(Body::empty()))
             }
         });

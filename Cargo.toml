@@ -20,7 +20,7 @@ features = ["server", "tcp", "http1"]
 
 [dependencies.serde]
 version = "1"
-default-features = false
+features = ["derive"]
 
 [dependencies.serde_json]
 version = "1"
