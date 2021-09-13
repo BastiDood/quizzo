@@ -7,8 +7,12 @@ resolver = "2"
 [dependencies]
 hyper-tls = "0.5"
 
-[dependencies.ring]
-version = "0.16"
+[dependencies.bytes]
+version = "1.1"
+default-features = false
+
+[dependencies.futures-util]
+version = "0.3"
 default-features = false
 
 [dependencies.hex]
@@ -19,10 +23,14 @@ features = ["alloc"]
 [dependencies.hyper]
 version = "0.14"
 default-features = false
-features = ["server", "client", "tcp", "http1"]
+features = ["server", "client", "tcp", "http1", "stream"]
 
 [dependencies.parking_lot]
 version = "0.11"
+default-features = false
+
+[dependencies.ring]
+version = "0.16"
 default-features = false
 
 [dependencies.slab]

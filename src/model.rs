@@ -83,9 +83,9 @@ fn skip_if_zero(flags: &u64) -> bool {
 
 #[derive(Serialize)]
 pub struct InteractionCallbackData<'txt> {
-    content: &'txt str,
+    pub content: &'txt str,
     #[serde(skip_serializing_if = "skip_if_zero")]
-    flags: u64,
+    pub flags: u64,
 }
 
 #[derive(Deserialize)]

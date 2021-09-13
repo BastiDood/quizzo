@@ -400,6 +400,8 @@ dependencies = [
 name = "quizzo"
 version = "0.2.0"
 dependencies = [
+ "bytes",
+ "futures-util",
  "hex",
  "hyper",
  "hyper-tls",
