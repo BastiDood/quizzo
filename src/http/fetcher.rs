@@ -3,15 +3,14 @@ use crate::model::{
     discord::{InteractionCallbackData, InteractionResponse},
     quiz::Quiz,
 };
-use bytes::{BufMut, BytesMut};
 use futures_util::TryStreamExt;
 use hyper::{body::Bytes, client::HttpConnector, Body, Client, Request, Uri};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 pub struct Fetcher {
-    buffer: BytesMut,
+    buffer: Vec<u8>,
     webhook_prefix: Arc<str>,
     application_command_endpoint: Uri,
     client: Client<HttpsConnector<HttpConnector>>,
@@ -20,7 +19,7 @@ pub struct Fetcher {
 impl Clone for Fetcher {
     fn clone(&self) -> Self {
         Self {
-            buffer: BytesMut::new(),
+            buffer: Vec::new(),
             webhook_prefix: Arc::clone(&self.webhook_prefix),
             application_command_endpoint: self.application_command_endpoint.clone(),
             client: self.client.clone(),
@@ -42,7 +41,7 @@ impl Fetcher {
             webhook_prefix,
             application_command_endpoint,
             client,
-            buffer: BytesMut::new(),
+            buffer: Vec::new(),
         }
     }
 
@@ -54,7 +53,7 @@ impl Fetcher {
 
         self.buffer.clear();
         while let Some(bytes) = body.try_next().await? {
-            self.buffer.put_slice(&bytes);
+            self.buffer.write_all(&bytes)?;
         }
 
         let value = serde_json::from_slice(&self.buffer)?;
@@ -72,7 +71,7 @@ impl Fetcher {
 
         self.buffer.clear();
         while let Some(bytes) = res.try_next().await? {
-            self.buffer.put_slice(&bytes);
+            self.buffer.write_all(&bytes)?;
         }
 
         let value = serde_json::from_slice(&self.buffer)?;
