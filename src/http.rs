@@ -1,8 +1,8 @@
-use crate::model::{InteractionCallbackData, InteractionResponse};
+use crate::model::discord::{InteractionCallbackData, InteractionResponse};
 use bytes::{BufMut, BytesMut};
 use futures_util::TryStreamExt;
 use hyper::{
-    body::{to_bytes, Bytes},
+    body::Bytes,
     client::HttpConnector,
     http::{self, uri::InvalidUri},
     Body, Client, Request, Uri,
@@ -74,11 +74,11 @@ impl Fetcher {
             webhook_prefix,
             application_command_endpoint,
             client,
-            buffer: Default::default(),
+            buffer: BytesMut::new(),
         }
     }
 
-    pub async fn get<'de, T>(&'de mut self, uri: Uri) -> Result<T, FetchError>
+    async fn get<'de, T>(&'de mut self, uri: Uri) -> Result<T, FetchError>
     where
         T: Deserialize<'de>,
     {
@@ -93,7 +93,7 @@ impl Fetcher {
         Ok(value)
     }
 
-    pub async fn post<'de, B, R>(&'de mut self, uri: Uri, body: &B) -> Result<R, FetchError>
+    async fn post<'de, B, R>(&'de mut self, uri: Uri, body: &B) -> Result<R, FetchError>
     where
         B: Serialize,
         R: Deserialize<'de>,

@@ -3,7 +3,7 @@
 
 use crate::{
     http::Fetcher,
-    model::{Interaction, InteractionData, InteractionResponse},
+    model::discord::{Interaction, InteractionData, InteractionResponse},
 };
 use parking_lot::RwLock;
 use slab::Slab;
