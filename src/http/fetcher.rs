@@ -1,46 +1,14 @@
-use crate::model::discord::{InteractionCallbackData, InteractionResponse};
+use super::FetchError;
+use crate::model::{
+    discord::{InteractionCallbackData, InteractionResponse},
+    quiz::Quiz,
+};
 use bytes::{BufMut, BytesMut};
 use futures_util::TryStreamExt;
-use hyper::{
-    body::Bytes,
-    client::HttpConnector,
-    http::{self, uri::InvalidUri},
-    Body, Client, Request, Uri,
-};
+use hyper::{body::Bytes, client::HttpConnector, Body, Client, Request, Uri};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-
-pub enum FetchError {
-    Hyper(hyper::Error),
-    Http(hyper::http::Error),
-    Json(serde_json::Error),
-    Uri(InvalidUri),
-}
-
-impl From<http::Error> for FetchError {
-    fn from(err: http::Error) -> Self {
-        Self::Http(err)
-    }
-}
-
-impl From<hyper::Error> for FetchError {
-    fn from(err: hyper::Error) -> Self {
-        Self::Hyper(err)
-    }
-}
-
-impl From<serde_json::Error> for FetchError {
-    fn from(err: serde_json::Error) -> Self {
-        Self::Json(err)
-    }
-}
-
-impl From<InvalidUri> for FetchError {
-    fn from(err: InvalidUri) -> Self {
-        Self::Uri(err)
-    }
-}
 
 pub struct Fetcher {
     buffer: BytesMut,
@@ -109,6 +77,12 @@ impl Fetcher {
 
         let value = serde_json::from_slice(&self.buffer)?;
         Ok(value)
+    }
+
+    pub async fn retrieve_quiz(&mut self, url: &str) -> Result<Quiz<'_>, FetchError> {
+        let uri = url.parse()?;
+        let quiz = self.get(uri).await?;
+        Ok(quiz)
     }
 
     pub async fn create_followup_message(&mut self, token: &str, content: &str) -> Result<(), FetchError> {
