@@ -1,5 +1,6 @@
 use serde::{
     de::{self, MapAccess, Visitor},
+    ser::SerializeStruct,
     Deserialize, Deserializer, Serialize,
 };
 use std::{collections::HashMap, num::NonZeroU64};
@@ -25,18 +26,55 @@ pub enum InteractionData<'txt> {
     },
 }
 
-#[derive(Serialize)]
-pub enum InteractionCallbackType {
-    Pong = 1,
-    ChannelMessageWithSource = 4,
-    DeferredChannelMessageWithSource,
-    DeferredUpdateMessage,
-    UpdateMessage,
+pub enum InteractionResponse<'a> {
+    Pong,
+    ChannelMessageWithSource(InteractionCallbackData<'a>),
+    DeferredChannelMessageWithSource(InteractionCallbackData<'a>),
+    DeferredUpdateMessage(InteractionCallbackData<'a>),
+    UpdateMessage(InteractionCallbackData<'a>),
 }
 
-pub struct InteractionResponse<'txt> {
-    r#type: InteractionCallbackType,
-    data: InteractionCallbackData<'txt>,
+impl InteractionResponse<'_> {
+    fn try_as_data(&self) -> Option<&InteractionCallbackData> {
+        match self {
+            Self::ChannelMessageWithSource(data)
+            | Self::DeferredChannelMessageWithSource(data)
+            | Self::DeferredUpdateMessage(data)
+            | Self::UpdateMessage(data) => Some(data),
+            _ => None,
+        }
+    }
+
+    fn to_int(&self) -> u8 {
+        match *self {
+            Self::Pong => 1,
+            Self::ChannelMessageWithSource(_) => 4,
+            Self::DeferredChannelMessageWithSource(_) => 5,
+            Self::DeferredUpdateMessage(_) => 6,
+            Self::UpdateMessage(_) => 7,
+        }
+    }
+}
+
+impl Serialize for InteractionResponse<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let field_count = match self {
+            Self::Pong => 1,
+            _ => 2,
+        };
+
+        let mut s = serializer.serialize_struct("InteractionResponse", field_count)?;
+        s.serialize_field("type", &self.to_int())?;
+        let data = match self.try_as_data() {
+            Some(d) => d,
+            _ => return s.end(),
+        };
+        s.serialize_field("data", data)?;
+        s.end()
+    }
 }
 
 fn skip_if_zero(flags: &u64) -> bool {
