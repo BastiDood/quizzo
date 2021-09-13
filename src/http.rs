@@ -32,6 +32,7 @@ impl From<InvalidUri> for FetchError {
 
 pub struct Fetcher {
     webhook_prefix: Box<str>,
+    application_command_endpoint: Uri,
     client: Client<HttpsConnector<HttpConnector>>,
 }
 
@@ -41,7 +42,15 @@ impl Fetcher {
         https.https_only(true);
         let client = Client::builder().build(https);
         let webhook_prefix = format!("https://discord.com/api/webhooks/{}/", application_id).into_boxed_str();
-        Self { webhook_prefix, client }
+        let application_command_endpoint: Uri =
+            format!("https://discord.com/api/applications/{}/commands", application_id)
+                .parse()
+                .unwrap();
+        Self {
+            webhook_prefix,
+            application_command_endpoint,
+            client,
+        }
     }
 
     pub async fn get(&self, uri: Uri) -> Result<Bytes, FetchError> {
@@ -57,5 +66,10 @@ impl Fetcher {
         let response = self.client.request(req).await?.into_body();
         let bytes = to_bytes(response).await?;
         Ok(bytes)
+    }
+
+    pub async fn create_application_command(&self) -> Result<Bytes, FetchError> {
+        let req = Request::post(self.application_command_endpoint.clone()).body(Body::empty())?;
+        todo!()
     }
 }

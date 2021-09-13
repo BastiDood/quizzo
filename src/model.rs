@@ -1,6 +1,6 @@
 use serde::{
     de::{self, MapAccess, Visitor},
-    Deserialize, Deserializer,
+    Deserialize, Deserializer, Serialize,
 };
 use std::{collections::HashMap, num::NonZeroU64};
 
@@ -23,6 +23,31 @@ pub enum InteractionData<'txt> {
         custom_id: &'txt str,
         selection: &'txt str,
     },
+}
+
+#[derive(Serialize)]
+pub enum InteractionCallbackType {
+    Pong = 1,
+    ChannelMessageWithSource = 4,
+    DeferredChannelMessageWithSource,
+    DeferredUpdateMessage,
+    UpdateMessage,
+}
+
+pub struct InteractionResponse<'txt> {
+    r#type: InteractionCallbackType,
+    data: InteractionCallbackData<'txt>,
+}
+
+fn skip_if_zero(flags: &u64) -> bool {
+    flags == &0
+}
+
+#[derive(Serialize)]
+pub struct InteractionCallbackData<'txt> {
+    content: &'txt str,
+    #[serde(skip_serializing_if = "skip_if_zero")]
+    flags: u64,
 }
 
 #[derive(Deserialize)]
