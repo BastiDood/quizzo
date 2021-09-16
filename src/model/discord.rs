@@ -77,10 +77,6 @@ impl Serialize for InteractionResponse<'_> {
     }
 }
 
-fn skip_if_zero(flags: &u64) -> bool {
-    flags == &0
-}
-
 fn skip_if_false(ephemeral: &bool) -> bool {
     !ephemeral
 }
@@ -115,6 +111,60 @@ pub struct InteractionCallbackData<'txt> {
     #[serde(skip_serializing_if = "skip_if_false")]
     #[serde(rename = "allowed_mentions")]
     pub allow_user_mentions: bool,
+}
+
+#[derive(Serialize)]
+pub struct SelectMenuOption<'txt> {
+    /// User-facing text.
+    label: &'txt str,
+    /// Dev-defined text.
+    value: &'txt str,
+    /// User-facing description accompanying the `label`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'txt str>,
+}
+
+pub enum MessageComponentVariant<'a> {
+    Button,
+    SelectMenu { options: &'a [SelectMenuOption<'a>] },
+}
+
+pub struct MessageComponent<'txt> {
+    pub custom_id: &'txt str,
+    pub placeholder: &'txt str,
+    pub variant: MessageComponentVariant<'txt>,
+}
+
+impl Serialize for MessageComponent<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let options = match self.variant {
+            MessageComponentVariant::SelectMenu { options } => options,
+            MessageComponentVariant::Button => todo!(),
+        };
+        let mut obj = serializer.serialize_struct("MessageComponent", 4)?;
+        obj.serialize_field("type", &3)?;
+        obj.serialize_field("custom_id", self.custom_id)?;
+        obj.serialize_field("placeholder", self.placeholder)?;
+        obj.serialize_field("options", options)?;
+        obj.end()
+    }
+}
+
+pub struct ActionRow<'c>(&'c [MessageComponent<'c>]);
+
+impl Serialize for ActionRow<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut obj = serializer.serialize_struct("MessageComponent", 2)?;
+        obj.serialize_field("type", &1)?;
+        obj.serialize_field("components", self.0)?;
+        obj.end()
+    }
 }
 
 #[derive(Deserialize)]

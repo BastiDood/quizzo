@@ -2,7 +2,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
 };
-use quizzo::{model::Interaction, validate_request, AppError};
+use quizzo::{model::discord::Interaction, validate_request, AppError};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,
