@@ -110,6 +110,7 @@ pub struct InteractionCallbackData<'txt> {
     pub ephemeral: bool,
     #[serde(skip_serializing_if = "skip_if_false")]
     #[serde(rename = "allowed_mentions")]
+    #[serde(serialize_with = "as_allowed_mentions")]
     pub allow_user_mentions: bool,
 }
 
@@ -125,32 +126,37 @@ pub struct SelectMenuOption<'txt> {
 }
 
 pub enum MessageComponentVariant<'a> {
-    Button,
-    SelectMenu { options: &'a [SelectMenuOption<'a>] },
+    Button {
+        value: &'a str,
+    },
+    SelectMenu {
+        placeholder: &'a str,
+        options: &'a [SelectMenuOption<'a>],
+    },
 }
 
-pub struct MessageComponent<'txt> {
-    pub custom_id: &'txt str,
-    pub placeholder: &'txt str,
-    pub variant: MessageComponentVariant<'txt>,
-}
-
-impl Serialize for MessageComponent<'_> {
+impl Serialize for MessageComponentVariant<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        let options = match self.variant {
-            MessageComponentVariant::SelectMenu { options } => options,
-            MessageComponentVariant::Button => todo!(),
+        let (placeholder, options) = match *self {
+            Self::SelectMenu { placeholder, options } => (placeholder, options),
+            _ => todo!(),
         };
-        let mut obj = serializer.serialize_struct("MessageComponent", 4)?;
-        obj.serialize_field("type", &3)?;
-        obj.serialize_field("custom_id", self.custom_id)?;
-        obj.serialize_field("placeholder", self.placeholder)?;
-        obj.serialize_field("options", options)?;
-        obj.end()
+        let mut s = serializer.serialize_struct("MessageComponentVariant", 3)?;
+        s.serialize_field("type", &3)?;
+        s.serialize_field("placeholder", placeholder)?;
+        s.serialize_field("options", options)?;
+        s.end()
     }
+}
+
+#[derive(Serialize)]
+pub struct MessageComponent<'txt> {
+    pub custom_id: &'txt str,
+    #[serde(flatten)]
+    pub variant: MessageComponentVariant<'txt>,
 }
 
 pub struct ActionRow<'c>(&'c [MessageComponent<'c>]);
