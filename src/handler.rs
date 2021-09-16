@@ -1,11 +1,14 @@
 //! # Panic
 //! Must be called in a Tokio context.
 
-use crate::{http::Fetcher, model::discord::InteractionCallbackData};
+use crate::{
+    http::{FetchError, Fetcher},
+    model::{discord::InteractionCallbackData, quiz::Quiz},
+};
 use parking_lot::RwLock;
 use slab::Slab;
-use std::{num::NonZeroU64, sync::Arc};
-use tokio::sync::mpsc::UnboundedSender;
+use std::{borrow::Cow, num::NonZeroU64, sync::Arc};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 type AnswerAndUser = (usize, u64);
 type PendingQuiz = UnboundedSender<AnswerAndUser>;
@@ -16,7 +19,21 @@ pub struct QuizHandler {
 }
 
 impl QuizHandler {
-    pub fn create_quiz(self: Arc<Self>, mut ctx: Fetcher, url: &str) {
+    pub async fn create_quiz(self: Arc<Self>, mut ctx: Fetcher, url: &str) -> InteractionCallbackData<'static> {
+        let Quiz {
+            question,
+            answer,
+            choices,
+            timeout,
+        } = match ctx.retrieve_quiz(url).await {
+            Ok(quiz) => quiz,
+            Err(FetchError::Http(_) | FetchError::Hyper(_)) => return InteractionCallbackData::FETCH_ERROR,
+            Err(FetchError::Uri(_)) => return InteractionCallbackData::MALFORMED_URL,
+            Err(FetchError::Io(_)) => return InteractionCallbackData::MALFORMED_QUIZ,
+        };
+
+        let (tx, rx) = unbounded_channel();
+        let key = self.quiz_channels.write().insert(tx);
         todo!()
     }
 

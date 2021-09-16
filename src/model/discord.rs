@@ -3,7 +3,7 @@ use serde::{
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::{collections::HashMap, num::NonZeroU64};
+use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 
 pub struct Interaction<'txt> {
     pub interaction_id: NonZeroU64,
@@ -98,6 +98,10 @@ where
     structure.end()
 }
 
+fn slice_is_empty<T>(items: &[T]) -> bool {
+    items.is_empty()
+}
+
 #[derive(Serialize)]
 pub struct InteractionCallbackData<'txt> {
     pub content: &'txt str,
@@ -109,6 +113,8 @@ pub struct InteractionCallbackData<'txt> {
     #[serde(rename = "allowed_mentions")]
     #[serde(serialize_with = "as_allowed_mentions")]
     pub allow_user_mentions: bool,
+    #[serde(skip_serializing_if = "slice_is_empty")]
+    pub components: &'txt [ActionRow<'txt>],
 }
 
 impl InteractionCallbackData<'static> {
@@ -116,18 +122,42 @@ impl InteractionCallbackData<'static> {
         content: "Your response has been recorded.",
         ephemeral: true,
         allow_user_mentions: false,
+        components: &[],
     };
 
     pub const MISSING_QUIZ: Self = Self {
         content: "Cannot find quiz.",
         ephemeral: true,
         allow_user_mentions: false,
+        components: &[],
     };
 
     pub const EXPIRED_QUIZ: Self = Self {
         content: "Quiz has already expired.",
         ephemeral: true,
         allow_user_mentions: false,
+        components: &[],
+    };
+
+    pub const FETCH_ERROR: Self = Self {
+        content: "Cannot fetch proper JSON schema.",
+        ephemeral: true,
+        allow_user_mentions: false,
+        components: &[],
+    };
+
+    pub const MALFORMED_QUIZ: Self = Self {
+        content: "Cannot proceed because the quiz is malformed.",
+        ephemeral: true,
+        allow_user_mentions: false,
+        components: &[],
+    };
+
+    pub const MALFORMED_URL: Self = Self {
+        content: "Malformed URL given.",
+        ephemeral: true,
+        allow_user_mentions: false,
+        components: &[],
     };
 }
 
@@ -144,10 +174,13 @@ pub struct SelectMenuOption<'txt> {
 
 pub enum MessageComponentVariant<'a> {
     Button {
+        /// User-facing value of the button.
         value: &'a str,
     },
     SelectMenu {
+        /// Temporary value for the menu select.
         placeholder: &'a str,
+        /// Values for each item in the dropdown.
         options: &'a [SelectMenuOption<'a>],
     },
 }

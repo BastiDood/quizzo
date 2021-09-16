@@ -4,7 +4,7 @@ use crate::model::{
     quiz::Quiz,
 };
 use futures_util::TryStreamExt;
-use hyper::{body::Bytes, client::HttpConnector, Body, Client, Request, Uri};
+use hyper::{client::HttpConnector, Body, Client, Request, Uri};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use std::{io::Write, sync::Arc};
@@ -90,6 +90,7 @@ impl Fetcher {
             content,
             ephemeral: false,
             allow_user_mentions: false,
+            components: &[],
         });
         self.post(uri, &payload).await
     }
