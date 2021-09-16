@@ -94,7 +94,7 @@ impl Fetcher {
         self.post(uri, &payload).await
     }
 
-    pub async fn create_application_command(&self) -> Result<Bytes, FetchError> {
+    pub async fn create_application_command(&self) -> Result<(), FetchError> {
         let req = Request::post(self.application_command_endpoint.clone()).body(Body::empty())?;
         todo!()
     }

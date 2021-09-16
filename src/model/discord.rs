@@ -93,11 +93,8 @@ where
     S: Serializer,
 {
     let mut structure = serializer.serialize_struct("AllowedMentions", 1)?;
-    if *allow_user_mentions {
-        structure.serialize_field("parse", &["users"])?;
-    } else {
-        structure.serialize_field("parse", &[] as &[&str])?;
-    }
+    let parse = if *allow_user_mentions { &["users"][..] } else { &[][..] };
+    structure.serialize_field("parse", parse)?;
     structure.end()
 }
 
@@ -112,6 +109,26 @@ pub struct InteractionCallbackData<'txt> {
     #[serde(rename = "allowed_mentions")]
     #[serde(serialize_with = "as_allowed_mentions")]
     pub allow_user_mentions: bool,
+}
+
+impl InteractionCallbackData<'static> {
+    pub const FOUND_QUIZ: Self = Self {
+        content: "Your response has been recorded.",
+        ephemeral: true,
+        allow_user_mentions: false,
+    };
+
+    pub const MISSING_QUIZ: Self = Self {
+        content: "Cannot find quiz.",
+        ephemeral: true,
+        allow_user_mentions: false,
+    };
+
+    pub const EXPIRED_QUIZ: Self = Self {
+        content: "Quiz has already expired.",
+        ephemeral: true,
+        allow_user_mentions: false,
+    };
 }
 
 #[derive(Serialize)]
