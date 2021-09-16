@@ -86,7 +86,11 @@ impl Fetcher {
 
     pub async fn create_followup_message(&mut self, token: &str, content: &str) -> Result<(), FetchError> {
         let uri: Uri = [self.webhook_prefix.as_ref(), token].concat().parse()?;
-        let payload = InteractionResponse::ChannelMessageWithSource(InteractionCallbackData { content, flags: 0 });
+        let payload = InteractionResponse::ChannelMessageWithSource(InteractionCallbackData {
+            content,
+            ephemeral: false,
+            allow_user_mentions: false,
+        });
         self.post(uri, &payload).await
     }
 

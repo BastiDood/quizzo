@@ -2,38 +2,24 @@
 //! Must be called in a Tokio context.
 
 use crate::{
-    http::Fetcher,
-    model::discord::{Interaction, InteractionData, InteractionResponse},
+    http::{FetchError, Fetcher},
+    model::discord::{Interaction, InteractionData},
 };
 use parking_lot::RwLock;
 use slab::Slab;
-use std::num::NonZeroU64;
+use std::{num::NonZeroU64, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
 type AnswerAndUser = (usize, u64);
 type PendingQuiz = UnboundedSender<AnswerAndUser>;
 
-pub struct Handler {
+pub struct QuizHandler {
     command_id: NonZeroU64,
-    client: Fetcher,
     quiz_channels: RwLock<Slab<PendingQuiz>>,
 }
 
-impl Handler {
-    pub fn on_interaction(
-        &self,
-        Interaction {
-            interaction_id,
-            application_id,
-            user_id,
-            data,
-            token,
-        }: Interaction,
-    ) -> InteractionResponse {
-        match data {
-            InteractionData::Ping => InteractionResponse::Pong,
-            InteractionData::AppCommand { url, name, command_id } if command_id == self.command_id => todo!(),
-            _ => todo!(),
-        }
+impl QuizHandler {
+    pub fn create_quiz(self: Arc<Self>, mut ctx: Fetcher, url: &str) {
+        todo!()
     }
 }

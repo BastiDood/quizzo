@@ -1,7 +1,7 @@
 use serde::{
     de::{self, MapAccess, Visitor},
     ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize,
+    Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::{collections::HashMap, num::NonZeroU64};
 
@@ -81,11 +81,40 @@ fn skip_if_zero(flags: &u64) -> bool {
     flags == &0
 }
 
+fn skip_if_false(ephemeral: &bool) -> bool {
+    !ephemeral
+}
+
+fn as_ephemeral_int<S>(ephemeral: &bool, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_u8(if *ephemeral { 1 << 6 } else { 0 })
+}
+
+fn as_allowed_mentions<S>(allow_user_mentions: &bool, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut structure = serializer.serialize_struct("AllowedMentions", 1)?;
+    if *allow_user_mentions {
+        structure.serialize_field("parse", &["users"])?;
+    } else {
+        structure.serialize_field("parse", &[] as &[&str])?;
+    }
+    structure.end()
+}
+
 #[derive(Serialize)]
 pub struct InteractionCallbackData<'txt> {
     pub content: &'txt str,
-    #[serde(skip_serializing_if = "skip_if_zero")]
-    pub flags: u64,
+    #[serde(skip_serializing_if = "skip_if_false")]
+    #[serde(rename = "flags")]
+    #[serde(serialize_with = "as_ephemeral_int")]
+    pub ephemeral: bool,
+    #[serde(skip_serializing_if = "skip_if_false")]
+    #[serde(rename = "allowed_mentions")]
+    pub allow_user_mentions: bool,
 }
 
 #[derive(Deserialize)]
