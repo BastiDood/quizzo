@@ -3,7 +3,7 @@ use serde::{
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
+use std::{collections::HashMap, num::NonZeroU64};
 
 pub struct Interaction<'txt> {
     pub interaction_id: NonZeroU64,
