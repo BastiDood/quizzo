@@ -13,8 +13,9 @@ pub enum Error {
     FailedFetch,
     /// JSON syntax error detected.
     Syntax,
-    /// Unexpected JSON data types encountered.
+    /// Unexpected data types encountered.
     Data,
+    Unrecoverable,
 }
 
 impl From<hyper::Error> for Error {
@@ -46,7 +47,8 @@ impl Display for Error {
             InvalidUri => "Invalid URI.",
             FailedFetch => "Failed to fetch the JSON data.",
             Syntax => "Syntax error in JSON detected.",
-            Data => "Unexpected data types in JSON detected.",
+            Data => "Unexpected data types detected.",
+            Unrecoverable => "Oops! We have encountered an unrecoverable error on our end.",
         })
     }
 }

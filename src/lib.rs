@@ -22,13 +22,13 @@ use twilight_model::{
     },
     channel::message::MessageFlags,
     id::{
-        marker::{ApplicationMarker, CommandMarker, GuildMarker, InteractionMarker},
+        marker::{ApplicationMarker, CommandMarker, GuildMarker, InteractionMarker, UserMarker},
         Id,
     },
 };
 
 type Key = Id<InteractionMarker>;
-type Channel = mpsc::Sender<()>;
+type Channel = mpsc::UnboundedSender<(Id<UserMarker>, usize)>;
 
 pub struct Lobby {
     /// Container for all pending polls.
@@ -45,8 +45,9 @@ pub struct Lobby {
 
 impl Lobby {
     const CREATE_NAME: &'static str = "create";
-    const PARAM_NAME: &'static str = "url";
     const CREATE_DESC: &'static str = "Create a quiz from JSON data.";
+    const PARAM_NAME: &'static str = "url";
+    const SELECT_MENU_ID: &'static str = "choices";
 
     /// Registers the quiz creation command.
     async fn register(
@@ -132,8 +133,6 @@ impl Lobby {
 
     /// Responds to new application commands.
     async fn on_app_comm(&self, mut comm: ApplicationCommand) -> Result<InteractionResponse> {
-        let user = comm.user.ok_or(Error::UnknownUser)?.id;
-
         if comm.data.id != self.command {
             return Err(Error::UnknownCommandId);
         }
@@ -183,11 +182,11 @@ impl Lobby {
         let components = Vec::from([Component::ActionRow(ActionRow {
             components: Vec::from([Component::SelectMenu(SelectMenu {
                 options,
-                custom_id: String::from("choices"),
+                custom_id: Self::SELECT_MENU_ID.into(),
                 placeholder: Some(String::from("Your Selection")),
                 disabled: false,
-                min_values: None,
-                max_values: None,
+                min_values: Some(1),
+                max_values: Some(1),
             })]),
         })]);
         Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
@@ -201,7 +200,32 @@ impl Lobby {
     }
 
     /// Responds to message component interactions.
-    async fn on_msg_interaction(&self, msg: MessageComponentInteraction) -> Result<InteractionResponse> {
-        todo!()
+    async fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> Result<InteractionResponse> {
+        if msg.data.custom_id.as_str() != Self::SELECT_MENU_ID {
+            return Err(Error::UnknownCommandId);
+        }
+
+        let user = msg.user.ok_or(Error::UnknownUser)?.id;
+
+        // Since we know that there can only be one value from this interaction,
+        // we simply pop the arguments directly. This allows O(1) deletion.
+        let arg = msg.data.values.pop().ok_or(Error::Unrecoverable)?;
+        let choice: usize = arg.parse().map_err(|_| Error::Data)?;
+        drop(arg);
+
+        self.quizzes
+            .get(&msg.id)
+            .ok_or(Error::Unrecoverable)?
+            .send((user, choice))
+            .map_err(|_| Error::Unrecoverable)?;
+
+        Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
+            content: Some(String::from("We have received your selection.")),
+            components: None,
+            flags: None,
+            tts: None,
+            allowed_mentions: None,
+            embeds: None,
+        }))
     }
 }
