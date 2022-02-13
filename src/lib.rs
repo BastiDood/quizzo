@@ -1,6 +1,10 @@
+mod error;
 mod quiz;
 
+use error::{Error, Result};
+
 use dashmap::DashMap;
+use hyper::Uri;
 use hyper_trust_dns::RustlsHttpsConnector;
 use tokio::sync::mpsc;
 
@@ -9,7 +13,10 @@ use twilight_model::{
     application::{
         callback::{CallbackData, InteractionResponse},
         command::{ChoiceCommandOptionData, CommandOption},
-        interaction::{ApplicationCommand, Interaction, MessageComponentInteraction},
+        interaction::{
+            application_command::{CommandDataOption, CommandOptionValue},
+            ApplicationCommand, Interaction, MessageComponentInteraction,
+        },
     },
     channel::message::MessageFlags,
     id::{
@@ -36,6 +43,7 @@ pub struct Lobby {
 
 impl Lobby {
     const CREATE_NAME: &'static str = "create";
+    const PARAM_NAME: &'static str = "url";
     const CREATE_DESC: &'static str = "Create a quiz from JSON data.";
 
     /// Registers the quiz creation command.
@@ -48,7 +56,7 @@ impl Lobby {
             choices: Vec::new(),
             description: String::from("URL from which to fetch JSON data."),
             required: true,
-            name: String::from("url"),
+            name: Self::PARAM_NAME.into(),
         })];
 
         let command_fut = if let Some(guild_id) = maybe_guild_id {
@@ -98,51 +106,60 @@ impl Lobby {
     }
 
     pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
-        use Interaction::*;
-        match interaction {
-            Ping(_) => todo!(),
-            ApplicationCommand(comm) => self.on_app_comm(*comm).await,
-            MessageComponent(msg) => self.on_msg_interaction(*msg).await,
-            _ => InteractionResponse::ChannelMessageWithSource(CallbackData {
-                content: Some(String::from("Unsupported interaction.")),
+        let result = match interaction {
+            Interaction::Ping(_) => todo!(),
+            Interaction::ApplicationCommand(comm) => self.on_app_comm(*comm).await,
+            Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg).await,
+            _ => Err(Error::UnsupportedInteraction),
+        };
+        result.unwrap_or_else(|err| {
+            InteractionResponse::ChannelMessageWithSource(CallbackData {
+                content: Some(err.to_string()),
                 flags: Some(MessageFlags::EPHEMERAL),
                 tts: None,
-                embeds: None,
-                components: None,
                 allowed_mentions: None,
-            }),
-        }
+                components: None,
+                embeds: None,
+            })
+        })
     }
 
     /// Responds to new application commands.
-    pub async fn on_app_comm(&self, comm: ApplicationCommand) -> InteractionResponse {
+    async fn on_app_comm(&self, mut comm: ApplicationCommand) -> Result<InteractionResponse> {
         if comm.data.id != self.command {
-            return InteractionResponse::ChannelMessageWithSource(CallbackData {
-                content: Some(String::from("Unknown command ID.")),
-                flags: Some(MessageFlags::EPHEMERAL),
-                tts: None,
-                embeds: None,
-                components: None,
-                allowed_mentions: None,
-            });
+            return Err(Error::UnknownCommandId);
         }
 
         if comm.data.name.as_str() != Self::CREATE_NAME {
-            return InteractionResponse::ChannelMessageWithSource(CallbackData {
-                content: Some(String::from("Unknown command name.")),
-                flags: Some(MessageFlags::EPHEMERAL),
-                tts: None,
-                embeds: None,
-                components: None,
-                allowed_mentions: None,
-            });
+            return Err(Error::UnknownCommandName);
         }
+
+        // NOTE: We pop off the values to attain O(1) removal time.
+        // This does mean that the validation will fail if there are more
+        // than one arguments supplied. This should be alright for now since
+        // we don't expect the `create` command to accept more than one argument.
+        let (name, value) = match comm.data.options.pop() {
+            Some(CommandDataOption {
+                name,
+                value: CommandOptionValue::String(value),
+                ..
+            }) => (name, value),
+            _ => return Err(Error::InvalidParams),
+        };
+
+        if name.as_str() != Self::PARAM_NAME {
+            return Err(Error::UnknownParamName);
+        }
+
+        drop(name);
+        let uri: Uri = value.parse().map_err(|_| Error::InvalidUri)?;
+        drop(value);
 
         todo!()
     }
 
     /// Responds to message component interactions.
-    pub async fn on_msg_interaction(&self, msg: MessageComponentInteraction) -> InteractionResponse {
+    async fn on_msg_interaction(&self, msg: MessageComponentInteraction) -> Result<InteractionResponse> {
         todo!()
     }
 }
