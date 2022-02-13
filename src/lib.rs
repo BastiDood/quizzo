@@ -1,6 +1,9 @@
+mod quiz;
+
 use dashmap::DashMap;
 use hyper::{client::HttpConnector, Client};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use quiz::Quiz;
 use tokio::sync::mpsc;
 
 use twilight_http::client::InteractionClient;
@@ -14,7 +17,7 @@ type Channel = mpsc::Sender<()>;
 
 pub struct Lobby<'client> {
     /// Container for all pending polls.
-    polls: DashMap<Key, Channel>,
+    quizzes: DashMap<Key, Channel>,
     /// Discord API interactions.
     api: InteractionClient<'client>,
     /// Arbitrary HTTP fetching of JSON files.
@@ -32,7 +35,7 @@ impl<'c> From<InteractionClient<'c>> for Lobby<'c> {
         Self {
             api,
             http,
-            polls: DashMap::new(),
+            quizzes: DashMap::new(),
         }
     }
 }
