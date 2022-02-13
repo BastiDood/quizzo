@@ -40,3 +40,6 @@ features = ["macros", "rt-multi-thread", "sync", "time"]
 version = "0.9"
 default-features = false
 features = ["decompression", "rustls-native-roots", "trust-dns"]
+
+[profile.release]
+lto = true
