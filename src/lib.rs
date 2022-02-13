@@ -5,7 +5,10 @@ use error::{Error, Result};
 use quiz::Quiz;
 
 use dashmap::DashMap;
-use hyper::{body::{self, Buf}, Uri};
+use hyper::{
+    body::{self, Buf},
+    Uri,
+};
 use hyper_trust_dns::RustlsHttpsConnector;
 use tokio::sync::mpsc;
 
@@ -14,6 +17,7 @@ use twilight_model::{
     application::{
         callback::{CallbackData, InteractionResponse},
         command::{ChoiceCommandOptionData, CommandOption},
+        component::{select_menu::SelectMenuOption, ActionRow, Component, SelectMenu},
         interaction::{
             application_command::{CommandDataOption, CommandOptionValue},
             ApplicationCommand, Interaction, MessageComponentInteraction,
@@ -113,20 +117,26 @@ impl Lobby {
             Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg).await,
             _ => Err(Error::UnsupportedInteraction),
         };
-        result.unwrap_or_else(|err| {
-            InteractionResponse::ChannelMessageWithSource(CallbackData {
-                content: Some(err.to_string()),
-                flags: Some(MessageFlags::EPHEMERAL),
-                tts: None,
-                allowed_mentions: None,
-                components: None,
-                embeds: None,
-            })
+
+        let text = match result {
+            Ok(res) => return res,
+            Err(err) => err.to_string(),
+        };
+
+        InteractionResponse::ChannelMessageWithSource(CallbackData {
+            content: Some(text),
+            flags: Some(MessageFlags::EPHEMERAL),
+            tts: None,
+            allowed_mentions: None,
+            components: None,
+            embeds: None,
         })
     }
 
     /// Responds to new application commands.
     async fn on_app_comm(&self, mut comm: ApplicationCommand) -> Result<InteractionResponse> {
+        let user = comm.user.ok_or(Error::UnknownUser)?.id;
+
         if comm.data.id != self.command {
             return Err(Error::UnknownCommandId);
         }
@@ -153,14 +163,44 @@ impl Lobby {
         }
 
         drop(name);
-        let uri: Uri = value.parse().map_err(|_| Error::InvalidUri)?;
+        let uri = value.parse().map_err(|_| Error::InvalidUri)?;
         drop(value);
 
         let body = self.http.get(uri).await.map_err(|_| Error::FailedFetch)?.into_body();
         let buf = body::aggregate(body).await?.reader();
-        let Quiz { .. } = serde_json::from_reader(buf)?;
+        let Quiz { question, choices, .. } = serde_json::from_reader(buf)?;
 
-        todo!()
+        // TODO: Spawn external Tokio task for handling incoming responses.
+
+        let options = choices
+            .into_iter()
+            .enumerate()
+            .map(|(i, label)| SelectMenuOption {
+                label,
+                description: None,
+                emoji: None,
+                default: false,
+                value: i.to_string(),
+            })
+            .collect();
+        let components = Vec::from([Component::ActionRow(ActionRow {
+            components: Vec::from([Component::SelectMenu(SelectMenu {
+                options,
+                custom_id: String::from("choices"),
+                placeholder: Some(String::from("Your Selection")),
+                disabled: false,
+                min_values: None,
+                max_values: None,
+            })]),
+        })]);
+        Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
+            content: Some(question),
+            components: Some(components),
+            flags: None,
+            tts: None,
+            allowed_mentions: None,
+            embeds: None,
+        }))
     }
 
     /// Responds to message component interactions.

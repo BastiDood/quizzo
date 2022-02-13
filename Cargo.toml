@@ -28,7 +28,7 @@ features = ["derive"]
 [dependencies.tokio]
 version = "1"
 default-features = false
-features = ["sync"]
+features = ["rt-multi-thread", "sync", "time"]
 
 [dependencies.twilight-http]
 version = "0.9"

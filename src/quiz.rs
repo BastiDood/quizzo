@@ -4,11 +4,11 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct Quiz {
     /// Question to be displayed in chat.
-    question: Box<str>,
+    pub question: String,
     /// Possible answers to select from.
-    choices: Box<[Box<str>]>,
+    pub choices: Vec<String>,
     /// Index of the selection with the correct answer.
-    answer: u8,
+    pub answer: u8,
     /// How long to wait before expiring the poll (in seconds).
-    timeout: u8,
+    pub timeout: u8,
 }
