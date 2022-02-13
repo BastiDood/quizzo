@@ -1,7 +1,6 @@
 mod quiz;
 
 use dashmap::DashMap;
-use hyper::Client;
 use hyper_trust_dns::RustlsHttpsConnector;
 use tokio::sync::mpsc;
 
@@ -14,7 +13,7 @@ use twilight_model::{
     },
     channel::message::MessageFlags,
     id::{
-        marker::{CommandMarker, GuildMarker, InteractionMarker},
+        marker::{ApplicationMarker, CommandMarker, GuildMarker, InteractionMarker},
         Id,
     },
 };
@@ -22,37 +21,26 @@ use twilight_model::{
 type Key = Id<InteractionMarker>;
 type Channel = mpsc::Sender<()>;
 
-pub struct Lobby<'client> {
+pub struct Lobby {
     /// Container for all pending polls.
     quizzes: DashMap<Key, Channel>,
     /// Discord API interactions.
-    api: InteractionClient<'client>,
+    api: twilight_http::Client,
     /// Arbitrary HTTP fetching of JSON files.
-    http: Client<RustlsHttpsConnector>,
+    http: hyper::Client<RustlsHttpsConnector>,
+    /// Application ID to match on.
+    app: Id<ApplicationMarker>,
     /// Command ID to match on.
     command: Id<CommandMarker>,
 }
 
-impl<'c> Lobby<'c> {
-    pub fn new(api: InteractionClient<'c>, command: Id<CommandMarker>) -> Self {
-        let connector = hyper_trust_dns::new_rustls_native_https_connector();
-        let http = Client::builder().http2_only(true).build(connector);
-        Self {
-            api,
-            http,
-            command,
-            quizzes: DashMap::new(),
-        }
-    }
-}
-
-impl Lobby<'_> {
+impl Lobby {
     const CREATE_NAME: &'static str = "create";
     const CREATE_DESC: &'static str = "Create a quiz from JSON data.";
 
     /// Registers the quiz creation command.
-    pub async fn register<'c>(
-        api: InteractionClient<'c>,
+    async fn register(
+        api: InteractionClient<'_>,
         maybe_guild_id: Option<Id<GuildMarker>>,
     ) -> anyhow::Result<Id<CommandMarker>> {
         let options = [CommandOption::String(ChoiceCommandOptionData {
@@ -85,6 +73,28 @@ impl Lobby<'_> {
             .await?
             .id
             .ok_or_else(|| anyhow::Error::msg("absent command ID"))
+    }
+
+    pub async fn new(
+        token: String,
+        app: Id<ApplicationMarker>,
+        maybe_guild_id: Option<Id<GuildMarker>>,
+    ) -> anyhow::Result<Self> {
+        // Initialize Discord API client
+        let api = twilight_http::Client::new(token);
+        let command = Self::register(api.interaction(app), maybe_guild_id).await?;
+
+        // Initialize HTTP client for fetching JSON
+        let connector = hyper_trust_dns::new_rustls_native_https_connector();
+        let http = hyper::Client::builder().http2_only(true).build(connector);
+
+        Ok(Self {
+            app,
+            command,
+            api,
+            http,
+            quizzes: DashMap::new(),
+        })
     }
 
     pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
