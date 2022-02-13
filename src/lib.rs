@@ -5,10 +5,7 @@ use error::{Error, Result};
 use quiz::Quiz;
 
 use dashmap::DashMap;
-use hyper::{
-    body::{self, Buf},
-    Uri,
-};
+use hyper::body::{self, Buf};
 use hyper_trust_dns::RustlsHttpsConnector;
 use tokio::sync::mpsc;
 
