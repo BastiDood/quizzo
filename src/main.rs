@@ -1,4 +1,4 @@
-use hyper::{body, service, Body, Response, Server, StatusCode, Uri};
+use hyper::{body, header::CONTENT_TYPE, service, Body, Response, Server, StatusCode, Uri};
 use quizzo::Lobby;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
@@ -71,9 +71,13 @@ fn main() -> anyhow::Result<()> {
                 let interaction = serde_json::from_slice(&bytes)?;
 
                 // Reply to the server
-                let response = lobby_inner.on_interaction(interaction).await;
-                let body: Body = serde_json::to_vec(&response)?.into();
-                anyhow::Ok(Response::new(body))
+                let reply = lobby_inner.on_interaction(interaction).await;
+                let body: Body = serde_json::to_vec(&reply)?.into();
+                let response = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(body)?;
+                anyhow::Ok(response)
             }
         })))
     });
