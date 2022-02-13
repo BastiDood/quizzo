@@ -471,6 +471,9 @@ name = "quizzo"
 version = "0.3.0"
 dependencies = [
  "dashmap",
+ "hyper",
+ "hyper-rustls",
+ "serde",
  "tokio",
  "twilight-http",
  "twilight-model",
