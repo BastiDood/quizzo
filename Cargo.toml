@@ -5,6 +5,7 @@ edition = "2021"
 resolver = "2"
 
 [dependencies]
+anyhow = "1"
 dashmap = { version = "5.1", default-features = false }
 twilight-model = { version = "0.9", default-features = false }
 
