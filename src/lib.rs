@@ -3,11 +3,12 @@ mod quiz;
 
 use error::{Error, Result};
 use quiz::Quiz;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use dashmap::DashMap;
 use hyper::body::{self, Buf};
 use hyper_trust_dns::RustlsHttpsConnector;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time};
 
 use twilight_http::client::InteractionClient;
 use twilight_model::{
@@ -28,13 +29,14 @@ use twilight_model::{
 };
 
 type Key = Id<InteractionMarker>;
-type Channel = mpsc::UnboundedSender<(Id<UserMarker>, usize)>;
+type Event = (Id<UserMarker>, usize);
+type Channel = mpsc::UnboundedSender<Event>;
 
 pub struct Lobby {
     /// Container for all pending polls.
     quizzes: DashMap<Key, Channel>,
     /// Discord API interactions.
-    api: twilight_http::Client,
+    api: Arc<twilight_http::Client>,
     /// Arbitrary HTTP fetching of JSON files.
     http: hyper::Client<RustlsHttpsConnector>,
     /// Application ID to match on.
@@ -88,7 +90,7 @@ impl Lobby {
         maybe_guild_id: Option<Id<GuildMarker>>,
     ) -> anyhow::Result<Self> {
         // Initialize Discord API client
-        let api = twilight_http::Client::new(token);
+        let api = Arc::new(twilight_http::Client::new(token));
         let command = Self::register(api.interaction(app), maybe_guild_id).await?;
 
         // Initialize HTTP client for fetching JSON
@@ -160,10 +162,27 @@ impl Lobby {
 
         let body = self.http.get(uri).await.map_err(|_| Error::FailedFetch)?.into_body();
         let buf = body::aggregate(body).await?.reader();
-        let Quiz { question, choices, .. } = serde_json::from_reader(buf)?;
+        let Quiz {
+            question,
+            choices,
+            timeout,
+            ..
+        } = serde_json::from_reader(buf)?;
 
-        // Spawn external Tokio task for handling incoming responses.
-        tokio::spawn(async move {});
+        // Spawn external Tokio task for handling incoming responses
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        self.quizzes.insert(comm.id, tx);
+        tokio::spawn(async move {
+            let timer = time::sleep(Duration::from_secs(timeout.into()));
+            tokio::pin!(timer);
+            loop {
+                let (user, choice) = tokio::select! {
+                    _ = &mut timer => break,
+                    Some(pair) = rx.recv() => pair,
+                    else => unreachable!(),
+                };
+            }
+        });
 
         let options = choices
             .into_iter()
@@ -176,7 +195,7 @@ impl Lobby {
                 value: i.to_string(),
             })
             .collect();
-        let components = Vec::from([Component::ActionRow(ActionRow {
+        let comps = Vec::from([Component::ActionRow(ActionRow {
             components: Vec::from([Component::SelectMenu(SelectMenu {
                 options,
                 custom_id: Self::SELECT_MENU_ID.into(),
@@ -188,7 +207,7 @@ impl Lobby {
         })]);
         Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
             content: Some(question),
-            components: Some(components),
+            components: Some(comps),
             flags: None,
             tts: None,
             allowed_mentions: None,
@@ -207,7 +226,7 @@ impl Lobby {
         // Since we know that there can only be one value from this interaction,
         // we simply pop the arguments directly. This allows O(1) deletion.
         let arg = msg.data.values.pop().ok_or(Error::Unrecoverable)?;
-        let choice: usize = arg.parse().map_err(|_| Error::Data)?;
+        let choice = arg.parse().map_err(|_| Error::Data)?;
         drop(arg);
 
         self.quizzes
