@@ -7,8 +7,14 @@ resolver = "2"
 [dependencies]
 anyhow = "1"
 dashmap = { version = "5.1", default-features = false }
+ring = { version = "0.16", default-features = false }
 serde_json = "1"
 twilight-model = { version = "0.9", default-features = false }
+
+[dependencies.hex]
+version = "0.4"
+default-features = false
+features = ["std"]
 
 [dependencies.hyper]
 version = "0.14"
