@@ -32,6 +32,7 @@ type Key = Id<InteractionMarker>;
 type Event = (Id<UserMarker>, usize);
 type Channel = mpsc::UnboundedSender<Event>;
 
+#[derive(Clone)]
 pub struct Lobby {
     /// Container for all pending polls.
     quizzes: Arc<DashMap<Key, Channel>>,
