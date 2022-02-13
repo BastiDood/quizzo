@@ -7,6 +7,7 @@ resolver = "2"
 [dependencies]
 anyhow = "1"
 dashmap = { version = "5.1", default-features = false }
+serde_json = "1"
 twilight-model = { version = "0.9", default-features = false }
 
 [dependencies.hyper]

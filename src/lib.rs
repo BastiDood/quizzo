@@ -2,9 +2,10 @@ mod error;
 mod quiz;
 
 use error::{Error, Result};
+use quiz::Quiz;
 
 use dashmap::DashMap;
-use hyper::Uri;
+use hyper::{body::{self, Buf}, Uri};
 use hyper_trust_dns::RustlsHttpsConnector;
 use tokio::sync::mpsc;
 
@@ -154,6 +155,10 @@ impl Lobby {
         drop(name);
         let uri: Uri = value.parse().map_err(|_| Error::InvalidUri)?;
         drop(value);
+
+        let body = self.http.get(uri).await.map_err(|_| Error::FailedFetch)?.into_body();
+        let buf = body::aggregate(body).await?.reader();
+        let Quiz { .. } = serde_json::from_reader(buf)?;
 
         todo!()
     }

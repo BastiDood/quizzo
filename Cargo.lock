@@ -656,6 +656,7 @@ dependencies = [
  "hyper",
  "hyper-trust-dns",
  "serde",
+ "serde_json",
  "tokio",
  "twilight-http",
  "twilight-model",
