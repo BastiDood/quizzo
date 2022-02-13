@@ -21,7 +21,7 @@ use twilight_model::{
             ApplicationCommand, Interaction, MessageComponentInteraction,
         },
     },
-    channel::message::MessageFlags,
+    channel::message::{AllowedMentions, MessageFlags},
     id::{
         marker::{ApplicationMarker, CommandMarker, GuildMarker, InteractionMarker, UserMarker},
         Id,
@@ -34,7 +34,7 @@ type Channel = mpsc::UnboundedSender<Event>;
 
 pub struct Lobby {
     /// Container for all pending polls.
-    quizzes: DashMap<Key, Channel>,
+    quizzes: Arc<DashMap<Key, Channel>>,
     /// Discord API interactions.
     api: Arc<twilight_http::Client>,
     /// Arbitrary HTTP fetching of JSON files.
@@ -102,7 +102,7 @@ impl Lobby {
             command,
             api,
             http,
-            quizzes: DashMap::new(),
+            quizzes: Arc::default(),
         })
     }
 
@@ -166,22 +166,60 @@ impl Lobby {
             question,
             choices,
             timeout,
+            answer,
             ..
         } = serde_json::from_reader(buf)?;
+        let answer = usize::from(answer);
+        let correct = choices.get(answer).ok_or(Error::Data)?.clone().into_boxed_str();
 
-        // Spawn external Tokio task for handling incoming responses
+        // Open channel to receiving new answers
         let (tx, mut rx) = mpsc::unbounded_channel();
         self.quizzes.insert(comm.id, tx);
+
+        // Spawn external Tokio task for handling incoming responses
+        let api = Arc::clone(&self.api);
+        let quizzes = Arc::clone(&self.quizzes);
+        let app_id = self.app;
         tokio::spawn(async move {
+            // Keep processing new answers
+            let mut selections = HashMap::new();
             let timer = time::sleep(Duration::from_secs(timeout.into()));
             tokio::pin!(timer);
             loop {
-                let (user, choice) = tokio::select! {
+                tokio::select! {
+                    biased;
+                    Some((user, choice)) = rx.recv() => selections.insert(user, choice),
                     _ = &mut timer => break,
-                    Some(pair) = rx.recv() => pair,
                     else => unreachable!(),
                 };
             }
+
+            // Disable all communication channels
+            drop(rx);
+            quizzes.remove(&comm.id);
+            drop(quizzes);
+
+            // Finalize the poll
+            let winners: Vec<_> = selections
+                .into_iter()
+                .filter_map(|(user, choice)| if choice == answer { Some(user) } else { None })
+                .collect();
+            let content = {
+                let mentions: Vec<_> = winners.iter().copied().map(|id| format!("<@{id}>")).collect();
+                let congrats = mentions.join(" ");
+                format!("The correct answer is **\"{correct}\"** Congratulations to {congrats}!")
+            };
+            api.interaction(app_id)
+                .create_followup_message(&comm.token)
+                .content(&content)
+                .unwrap()
+                .allowed_mentions(&AllowedMentions {
+                    users: winners,
+                    ..Default::default()
+                })
+                .exec()
+                .await
+                .unwrap();
         });
 
         let options = choices
