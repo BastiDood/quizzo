@@ -1,8 +1,8 @@
 mod quiz;
 
 use dashmap::DashMap;
-use hyper::{client::HttpConnector, Client};
-use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use hyper::Client;
+use hyper_trust_dns::RustlsHttpsConnector;
 use quiz::Quiz;
 use tokio::sync::mpsc;
 
@@ -21,16 +21,12 @@ pub struct Lobby<'client> {
     /// Discord API interactions.
     api: InteractionClient<'client>,
     /// Arbitrary HTTP fetching of JSON files.
-    http: Client<HttpsConnector<HttpConnector>>,
+    http: Client<RustlsHttpsConnector>,
 }
 
 impl<'c> From<InteractionClient<'c>> for Lobby<'c> {
     fn from(api: InteractionClient<'c>) -> Self {
-        let connector = HttpsConnectorBuilder::new()
-            .with_native_roots()
-            .https_only()
-            .enable_http2()
-            .build();
+        let connector = hyper_trust_dns::new_rustls_native_https_connector();
         let http = Client::builder().http2_only(true).build(connector);
         Self {
             api,

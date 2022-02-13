@@ -13,10 +13,10 @@ version = "0.14"
 default-features = false
 features = ["client"]
 
-[dependencies.hyper-rustls]
-version = "0.23"
+[dependencies.hyper-trust-dns]
+version = "0.3"
 default-features = false
-features = ["native-tokio"]
+features = ["https-only", "rustls-http2", "rustls-native"]
 
 [dependencies.serde]
 version = "1"
@@ -31,4 +31,4 @@ features = ["sync"]
 [dependencies.twilight-http]
 version = "0.9"
 default-features = false
-features = ["decompression", "rustls-native-roots"]
+features = ["decompression", "rustls-native-roots", "trust-dns"]
