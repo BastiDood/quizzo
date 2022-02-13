@@ -64,17 +64,13 @@ impl Lobby {
 
         let command_fut = if let Some(guild_id) = maybe_guild_id {
             api.create_guild_command(guild_id)
-                .chat_input(Self::CREATE_NAME, Self::CREATE_DESC)
-                .unwrap()
-                .command_options(&options)
-                .unwrap()
+                .chat_input(Self::CREATE_NAME, Self::CREATE_DESC)?
+                .command_options(&options)?
                 .exec()
         } else {
             api.create_global_command()
-                .chat_input(Self::CREATE_NAME, Self::CREATE_DESC)
-                .unwrap()
-                .command_options(&options)
-                .unwrap()
+                .chat_input(Self::CREATE_NAME, Self::CREATE_DESC)?
+                .command_options(&options)?
                 .exec()
         };
 
@@ -166,7 +162,8 @@ impl Lobby {
         let buf = body::aggregate(body).await?.reader();
         let Quiz { question, choices, .. } = serde_json::from_reader(buf)?;
 
-        // TODO: Spawn external Tokio task for handling incoming responses.
+        // Spawn external Tokio task for handling incoming responses.
+        tokio::spawn(async move {});
 
         let options = choices
             .into_iter()
