@@ -3,3 +3,17 @@ name = "quizzo"
 version = "0.3.0"
 edition = "2021"
 resolver = "2"
+
+[dependencies]
+dashmap = { version = "5.1", default-features = false }
+twilight-model = { version = "0.9", default-features = false }
+
+[dependencies.tokio]
+version = "1"
+default-features = false
+features = ["sync"]
+
+[dependencies.twilight-http]
+version = "0.9"
+default-features = false
+features = ["decompression", "rustls-native-roots"]
