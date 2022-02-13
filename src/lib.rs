@@ -109,7 +109,7 @@ impl Lobby {
 
     pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
         let result = match interaction {
-            Interaction::Ping(_) => todo!(),
+            Interaction::Ping(_) => Ok(InteractionResponse::Pong),
             Interaction::ApplicationCommand(comm) => self.on_app_comm(*comm).await,
             Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg).await,
             _ => Err(Error::UnsupportedInteraction),
