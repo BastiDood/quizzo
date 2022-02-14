@@ -22,7 +22,7 @@ const response = await fetch(endpoint, {
         options: [
             {
                 type: 3,
-                name: 'create',
+                name: 'url',
                 description: 'URL from which to retrieve the JSON data.',
                 required: true,
                 min_value: 1,
