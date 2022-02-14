@@ -27,39 +27,38 @@ fn main() -> anyhow::Result<()> {
         _ => None,
     };
 
-    // Initialize service handler
-    let runtime = Runtime::new()?;
-    let future = Lobby::new(token, app, maybe_guild_id);
-    let lobby = runtime.block_on(future)?;
-    let service = hyper::service::make_service_fn(move |_| {
-        let lobby_outer = lobby.clone();
-        let public_outer = public.clone();
-        future::ready(Ok::<_, Infallible>(hyper::service::service_fn(move |req| {
-            let lobby_inner = lobby_outer.clone();
-            let public_inner = public_outer.clone();
-            async move {
-                let future = service::try_respond(req, &lobby_inner, &public_inner);
-                let response = match future.await {
-                    Ok(bytes) => {
-                        let mut response = Response::new(Body::from(bytes));
-                        response
-                            .headers_mut()
-                            .append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-                        response
-                    }
-                    Err(code) => {
-                        let mut response = Response::new(Body::empty());
-                        *response.status_mut() = code;
-                        response
-                    }
-                };
-                Ok::<_, Infallible>(response)
-            }
-        })))
-    });
-
     // Run the server
     let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
-    runtime.block_on(Server::bind(&addr).serve(service))?;
-    Ok(())
+    Runtime::new()?.block_on(async move {
+        let lobby = Lobby::new(token, app, maybe_guild_id).await?;
+        let service = hyper::service::make_service_fn(move |_| {
+            let lobby_outer = lobby.clone();
+            let public_outer = public.clone();
+            future::ready(Ok::<_, Infallible>(hyper::service::service_fn(move |req| {
+                let lobby_inner = lobby_outer.clone();
+                let public_inner = public_outer.clone();
+                async move {
+                    let future = service::try_respond(req, &lobby_inner, &public_inner);
+                    let response = match future.await {
+                        Ok(bytes) => {
+                            let mut response = Response::new(Body::from(bytes));
+                            response
+                                .headers_mut()
+                                .append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                            response
+                        }
+                        Err(code) => {
+                            let mut response = Response::new(Body::empty());
+                            *response.status_mut() = code;
+                            response
+                        }
+                    };
+                    Ok::<_, Infallible>(response)
+                }
+            })))
+        });
+
+        Server::bind(&addr).serve(service).await?;
+        Ok(())
+    })
 }
