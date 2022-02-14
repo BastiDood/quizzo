@@ -25,6 +25,9 @@ TOKEN=
 PORT=
 GUILD_ID=
 
+# Register the required commands
+deno run --allow-net --allow-env scripts/register-commands.ts
+
 # Start the bot!
 cargo run --release
 ```
