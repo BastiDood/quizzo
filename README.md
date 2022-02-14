@@ -5,7 +5,7 @@ _Quizzo_ is a [Discord bot](https://discord.com/api/oauth2/authorize?client_id=8
 This bot is powered by the [Twilight library](https://github.com/twilight-rs/twilight) for the [Rust programming language](https://www.rust-lang.org/tools/install). Before running the bot, the following environment variables must be set:
 
 **Variable** | **Description**                                                                                               | **Required?**
--------------|---------------------------------------------------------------------------------------------------------------|--------------
+-------------|---------------------------------------------------------------------------------------------------------------|:-------------:
 `PUB_KEY`    | Cryptograhpic public key provided by the [Discord Developer Portal](portal).                                  | &#x2714;
 `APP_ID`     | Application ID provided by the [Discord Developer Portal](portal).                                            | &#x2714;
 `TOKEN`      | Bot token provided by the [Discord Developer Portal](portal).                                                 | &#x2714;
