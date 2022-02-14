@@ -46,7 +46,7 @@ impl Lobby {
     const CREATE_NAME: &'static str = "create";
     const PARAM_NAME: &'static str = "url";
 
-    pub async fn new(token: String, app: Id<ApplicationMarker>) -> anyhow::Result<Self> {
+    pub fn new(token: String, app: Id<ApplicationMarker>) -> Self {
         // Initialize Discord API client
         let api = Arc::new(twilight_http::Client::new(token));
 
@@ -54,12 +54,12 @@ impl Lobby {
         let connector = hyper_trust_dns::new_rustls_native_https_connector();
         let http = hyper::Client::builder().http2_only(true).build(connector);
 
-        Ok(Self {
+        Self {
             app,
             api,
             http,
             quizzes: Arc::default(),
-        })
+        }
     }
 
     pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
