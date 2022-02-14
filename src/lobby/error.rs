@@ -7,6 +7,7 @@ use std::{
 
 pub enum Error {
     UnsupportedInteraction,
+    UnknownQuiz,
     UnknownUser,
     UnknownCommandName,
     InvalidParams,
@@ -64,6 +65,7 @@ impl Display for Error {
         use Error::*;
         f.write_str(match self {
             UnsupportedInteraction => "Unsupported interaction.",
+            UnknownQuiz => "Quiz not found. It may have already expired.",
             UnknownUser => "Unknown user.",
             UnknownCommandName => "Unknown command name.",
             InvalidParams => "Invalid parameter list.",

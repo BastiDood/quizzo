@@ -264,7 +264,7 @@ impl Lobby {
         self.quizzes
             .read()
             .get(quiz_id)
-            .ok_or(Error::Unrecoverable)?
+            .ok_or(Error::UnknownQuiz)?
             .send((user, choice))
             .map_err(|_| Error::Unrecoverable)?;
 
