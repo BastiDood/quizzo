@@ -4,9 +4,10 @@ use crate::quiz::Quiz;
 use error::{Error, Result};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use dashmap::DashMap;
 use hyper::body::{self, Buf};
 use hyper_trust_dns::RustlsHttpsConnector;
+use parking_lot::RwLock;
+use slab::Slab;
 use tokio::{sync::mpsc, time};
 
 use twilight_http::client::InteractionClient;
@@ -22,19 +23,19 @@ use twilight_model::{
     },
     channel::message::{AllowedMentions, MessageFlags},
     id::{
-        marker::{ApplicationMarker, CommandMarker, GuildMarker, InteractionMarker, UserMarker},
+        marker::{ApplicationMarker, CommandMarker, GuildMarker, UserMarker},
         Id,
     },
 };
 
-type Key = Id<InteractionMarker>;
 type Event = (Id<UserMarker>, usize);
 type Channel = mpsc::UnboundedSender<Event>;
+type QuizRegistry = RwLock<Slab<Channel>>;
 
 #[derive(Clone)]
 pub struct Lobby {
     /// Container for all pending polls.
-    quizzes: Arc<DashMap<Key, Channel>>,
+    quizzes: Arc<QuizRegistry>,
     /// Discord API interactions.
     api: Arc<twilight_http::Client>,
     /// Arbitrary HTTP fetching of JSON files.
@@ -49,7 +50,6 @@ impl Lobby {
     const CREATE_NAME: &'static str = "create";
     const CREATE_DESC: &'static str = "Create a quiz from JSON data.";
     const PARAM_NAME: &'static str = "url";
-    const SELECT_MENU_ID: &'static str = "choices";
 
     /// Registers the quiz creation command.
     async fn register(
@@ -173,7 +173,7 @@ impl Lobby {
 
         // Open channel to receiving new answers
         let (tx, mut rx) = mpsc::unbounded_channel();
-        self.quizzes.insert(comm.id, tx);
+        let quiz_id = self.quizzes.write().insert(tx);
 
         // Spawn external Tokio task for handling incoming responses
         let api = Arc::clone(&self.api);
@@ -195,7 +195,7 @@ impl Lobby {
 
             // Disable all communication channels
             drop(rx);
-            quizzes.remove(&comm.id);
+            quizzes.write().remove(quiz_id);
             drop(quizzes);
 
             // Finalize the poll
@@ -237,7 +237,7 @@ impl Lobby {
         let comps = Vec::from([Component::ActionRow(ActionRow {
             components: Vec::from([Component::SelectMenu(SelectMenu {
                 options,
-                custom_id: Self::SELECT_MENU_ID.into(),
+                custom_id: quiz_id.to_string(),
                 placeholder: Some(String::from("Your Selection")),
                 disabled: false,
                 min_values: Some(1),
@@ -256,10 +256,7 @@ impl Lobby {
 
     /// Responds to message component interactions.
     async fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> Result<InteractionResponse> {
-        if msg.data.custom_id.as_str() != Self::SELECT_MENU_ID {
-            return Err(Error::UnknownCommandId);
-        }
-
+        let quiz_id = msg.data.custom_id.parse().map_err(|_| Error::Unrecoverable)?;
         let user = msg
             .member
             .and_then(|m| m.user)
@@ -274,7 +271,8 @@ impl Lobby {
         drop(arg);
 
         self.quizzes
-            .get(&msg.id)
+            .read()
+            .get(quiz_id)
             .ok_or(Error::Unrecoverable)?
             .send((user, choice))
             .map_err(|_| Error::Unrecoverable)?;
