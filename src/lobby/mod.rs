@@ -137,7 +137,7 @@ impl Lobby {
 
         // Verify that the content type is JSON
         let mime = headers.get(CONTENT_TYPE).ok_or(Error::FailedFetch)?.to_str()?;
-        if mime.contains(APPLICATION_JSON) {
+        if !mime.starts_with(APPLICATION_JSON) {
             return Err(Error::UnknownContent);
         }
 
