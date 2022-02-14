@@ -279,8 +279,8 @@ impl Lobby {
 
         Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
             content: Some(String::from("We have received your selection.")),
+            flags: Some(MessageFlags::EPHEMERAL),
             components: None,
-            flags: None,
             tts: None,
             allowed_mentions: None,
             embeds: None,
