@@ -4,7 +4,6 @@ use std::fmt::{self, Display};
 pub enum Error {
     UnsupportedInteraction,
     UnknownUser,
-    UnknownCommandId,
     UnknownCommandName,
     InvalidParams,
     UnknownParamName,
@@ -40,7 +39,6 @@ impl Display for Error {
         f.write_str(match self {
             UnsupportedInteraction => "Unsupported interaction.",
             UnknownUser => "Unknown user.",
-            UnknownCommandId => "Unknown command ID.",
             UnknownCommandName => "Unknown command name.",
             InvalidParams => "Invalid parameter list.",
             UnknownParamName => "Unknown parameter name.",

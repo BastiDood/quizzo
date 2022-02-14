@@ -22,15 +22,11 @@ fn main() -> anyhow::Result<()> {
     let port = env::var("PORT")?.parse()?;
     let app = env::var("APP_ID")?.parse()?;
     let token = env::var("TOKEN")?;
-    let maybe_guild_id = match env::var("GUILD_ID") {
-        Ok(guild_id) => Some(guild_id.parse()?),
-        _ => None,
-    };
 
     // Run the server
     let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
     Runtime::new()?.block_on(async move {
-        let lobby = Lobby::new(token, app, maybe_guild_id).await?;
+        let lobby = Lobby::new(token, app).await?;
         let service = hyper::service::make_service_fn(move |_| {
             let lobby_outer = lobby.clone();
             let public_outer = public.clone();

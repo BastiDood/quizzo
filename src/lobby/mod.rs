@@ -10,11 +10,9 @@ use parking_lot::RwLock;
 use slab::Slab;
 use tokio::{sync::mpsc, time};
 
-use twilight_http::client::InteractionClient;
 use twilight_model::{
     application::{
         callback::{CallbackData, InteractionResponse},
-        command::{ChoiceCommandOptionData, CommandOption},
         component::{select_menu::SelectMenuOption, ActionRow, Component, SelectMenu},
         interaction::{
             application_command::{CommandDataOption, CommandOptionValue},
@@ -23,7 +21,7 @@ use twilight_model::{
     },
     channel::message::{AllowedMentions, MessageFlags},
     id::{
-        marker::{ApplicationMarker, CommandMarker, GuildMarker, UserMarker},
+        marker::{ApplicationMarker, UserMarker},
         Id,
     },
 };
@@ -42,56 +40,15 @@ pub struct Lobby {
     http: hyper::Client<RustlsHttpsConnector>,
     /// Application ID to match on.
     app: Id<ApplicationMarker>,
-    /// Command ID to match on.
-    command: Id<CommandMarker>,
 }
 
 impl Lobby {
     const CREATE_NAME: &'static str = "create";
-    const CREATE_DESC: &'static str = "Create a quiz from JSON data.";
     const PARAM_NAME: &'static str = "url";
 
-    /// Registers the quiz creation command.
-    async fn register(
-        api: InteractionClient<'_>,
-        maybe_guild_id: Option<Id<GuildMarker>>,
-    ) -> anyhow::Result<Id<CommandMarker>> {
-        let options = [CommandOption::String(ChoiceCommandOptionData {
-            autocomplete: false,
-            choices: Vec::new(),
-            description: String::from("URL from which to fetch JSON data."),
-            required: true,
-            name: Self::PARAM_NAME.into(),
-        })];
-
-        let command_fut = if let Some(guild_id) = maybe_guild_id {
-            api.create_guild_command(guild_id)
-                .chat_input(Self::CREATE_NAME, Self::CREATE_DESC)?
-                .command_options(&options)?
-                .exec()
-        } else {
-            api.create_global_command()
-                .chat_input(Self::CREATE_NAME, Self::CREATE_DESC)?
-                .command_options(&options)?
-                .exec()
-        };
-
-        command_fut
-            .await?
-            .model()
-            .await?
-            .id
-            .ok_or_else(|| anyhow::Error::msg("absent command ID"))
-    }
-
-    pub async fn new(
-        token: String,
-        app: Id<ApplicationMarker>,
-        maybe_guild_id: Option<Id<GuildMarker>>,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(token: String, app: Id<ApplicationMarker>) -> anyhow::Result<Self> {
         // Initialize Discord API client
         let api = Arc::new(twilight_http::Client::new(token));
-        let command = Self::register(api.interaction(app), maybe_guild_id).await?;
 
         // Initialize HTTP client for fetching JSON
         let connector = hyper_trust_dns::new_rustls_native_https_connector();
@@ -99,7 +56,6 @@ impl Lobby {
 
         Ok(Self {
             app,
-            command,
             api,
             http,
             quizzes: Arc::default(),
@@ -131,10 +87,6 @@ impl Lobby {
 
     /// Responds to new application commands.
     async fn on_app_comm(&self, mut comm: ApplicationCommand) -> Result<InteractionResponse> {
-        if comm.data.id != self.command {
-            return Err(Error::UnknownCommandId);
-        }
-
         if comm.data.name.as_str() != Self::CREATE_NAME {
             return Err(Error::UnknownCommandName);
         }
