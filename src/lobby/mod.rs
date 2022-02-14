@@ -260,7 +260,12 @@ impl Lobby {
             return Err(Error::UnknownCommandId);
         }
 
-        let user = msg.user.ok_or(Error::UnknownUser)?.id;
+        let user = msg
+            .member
+            .and_then(|m| m.user)
+            .or(msg.user)
+            .ok_or(Error::UnknownUser)?
+            .id;
 
         // Since we know that there can only be one value from this interaction,
         // we simply pop the arguments directly. This allows O(1) deletion.
