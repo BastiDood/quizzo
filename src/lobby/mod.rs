@@ -204,11 +204,11 @@ impl Lobby {
                 .filter_map(|(user, choice)| if choice == answer { Some(user) } else { None })
                 .collect();
             let content = if winners.is_empty() {
-                String::from("The correct answer is **\"{correct}\"**. Nobody got it right...")
+                String::from("The correct answer is: {correct}. Nobody got it right...")
             } else {
                 let mentions: Vec<_> = winners.iter().copied().map(|id| format!("<@{id}>")).collect();
                 let congrats = mentions.join(" ");
-                format!("The correct answer is **\"{correct}\"**. Congratulations to {congrats}!")
+                format!("The correct answer is: {correct}. Congratulations to {congrats}!")
             };
             api.interaction(app_id)
                 .create_followup_message(&comm.token)
