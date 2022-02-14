@@ -91,7 +91,6 @@ fn main() -> anyhow::Result<()> {
 
     // Run the server
     let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
-    let server = Server::bind(&addr);
-    runtime.block_on(server.serve(service))?;
+    runtime.block_on(Server::bind(&addr).serve(service))?;
     Ok(())
 }
