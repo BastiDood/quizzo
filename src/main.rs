@@ -1,4 +1,4 @@
-use hyper::{body, header::CONTENT_TYPE, service, Body, Response, Server, StatusCode, Uri};
+use hyper::{body, header::CONTENT_TYPE, service, Body, Method, Response, Server, StatusCode, Uri};
 use quizzo::Lobby;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
@@ -35,6 +35,13 @@ fn main() -> anyhow::Result<()> {
             let lobby_inner = lobby_outer.clone();
             let public_inner = public_outer.clone();
             async move {
+                // Disable all non-`POST` requests
+                if req.method() != Method::POST {
+                    let mut response = Response::new(Body::empty());
+                    *response.status_mut() = StatusCode::METHOD_NOT_ALLOWED;
+                    return Ok(response);
+                }
+
                 // For now, we only allow requests from the root endpoint.
                 if req.uri() != &Uri::from_static("/") {
                     let mut response = Response::new(Body::empty());
