@@ -20,6 +20,8 @@ pub enum Error {
     Data,
     /// JSON payload too large.
     TooLarge,
+    /// Payload is not JSON.
+    UnknownContent,
     Unrecoverable,
 }
 
@@ -71,6 +73,7 @@ impl Display for Error {
             Syntax => "Syntax error in JSON detected.",
             Data => "Unexpected data types detected.",
             TooLarge => "JSON payload is too large. Try sending something less than a kilobyte?",
+            UnknownContent => "Payload is not JSON.",
             Unrecoverable => "Oops! We have encountered an unrecoverable error on our end.",
         })
     }
