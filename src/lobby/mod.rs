@@ -19,7 +19,7 @@ use twilight_model::{
             ApplicationCommand, Interaction, MessageComponentInteraction,
         },
     },
-    channel::message::{AllowedMentions, MessageFlags},
+    channel::message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags},
     id::{
         marker::{ApplicationMarker, UserMarker},
         Id,
@@ -141,7 +141,7 @@ impl Lobby {
                     biased;
                     Some((user, choice)) = rx.recv() => selections.insert(user, choice),
                     _ = &mut timer => break,
-                    else => unreachable!(),
+                    else => anyhow::bail!("unreachable state encountered"),
                 };
             }
 
@@ -150,29 +150,39 @@ impl Lobby {
             quizzes.write().remove(quiz_id);
             drop(quizzes);
 
-            // Finalize the poll
+            // Disable components from original message
+            let client = api.interaction(app_id);
+            client
+                .update_interaction_original(&comm.token)
+                .components(None)?
+                .content(Some("Time's up! This quiz has expired."))?
+                .exec()
+                .await?;
+
+            // Generate congratulations
             let winners: Vec<_> = selections
                 .into_iter()
-                .filter_map(|(user, choice)| if choice == answer { Some(user) } else { None })
+                .filter_map(|(user, choice)| if choice == answer { Some(format!("<@{user}>")) } else { None })
                 .collect();
             let content = if winners.is_empty() {
-                format!("The correct answer is: **{correct}**. Nobody got it right...")
+                format!("The correct answer is: ||{correct}||. Nobody got it right...")
             } else {
-                let mentions: Vec<_> = winners.iter().copied().map(|id| format!("<@{id}>")).collect();
-                let congrats = mentions.join(" ");
-                format!("The correct answer is: **{correct}**. Congratulations to {congrats}!")
+                let congrats = winners.join(" ");
+                format!("The correct answer is: ||{correct}||. Congratulations to {congrats}!")
             };
-            api.interaction(app_id)
+            drop(winners);
+
+            // Issue follow-up message for winners
+            client
                 .create_followup_message(&comm.token)
-                .content(&content)
-                .unwrap()
+                .content(&content)?
                 .allowed_mentions(&AllowedMentions {
-                    users: winners,
+                    parse: vec![ParseTypes::Users],
                     ..Default::default()
                 })
                 .exec()
-                .await
-                .unwrap();
+                .await?;
+            anyhow::Ok(())
         });
 
         let options = choices
