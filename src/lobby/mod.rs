@@ -183,8 +183,8 @@ impl Lobby {
             let client = api.interaction(app_id);
             client
                 .update_interaction_original(&comm.token)
-                .components(None)?
                 .content(Some("Time's up! This quiz has expired."))?
+                .components(None)?
                 .exec()
                 .await?;
 
