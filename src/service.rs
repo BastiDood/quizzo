@@ -40,6 +40,7 @@ pub async fn try_respond<B: HttpBody>(req: Request<B>, lobby: &Lobby, public: &P
     drop(signature);
     drop(message);
     let interaction = serde_json::from_slice(&bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
+    drop(bytes);
 
     // Construct new body
     let reply = lobby.on_interaction(interaction).await;
