@@ -4,7 +4,11 @@ use crate::quiz::Quiz;
 use error::{Error, Result};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use hyper::body::{self, Buf};
+use hyper::{
+    body::{self, Buf},
+    header::{HeaderValue, ACCEPT, CONTENT_LENGTH, CONTENT_TYPE},
+    Body, Request,
+};
 use hyper_trust_dns::RustlsHttpsConnector;
 use parking_lot::RwLock;
 use slab::Slab;
@@ -25,6 +29,8 @@ use twilight_model::{
         Id,
     },
 };
+
+pub const APPLICATION_JSON: &str = "application/json";
 
 type Event = (Id<UserMarker>, usize);
 type Channel = mpsc::UnboundedSender<Event>;
@@ -109,11 +115,34 @@ impl Lobby {
         }
 
         drop(name);
-        let uri = value.parse().map_err(|_| Error::InvalidUri)?;
+        let uri = value.parse()?;
         drop(value);
 
-        let body = self.http.get(uri).await.map_err(|_| Error::FailedFetch)?.into_body();
-        let buf = body::aggregate(body).await?.reader();
+        // Construct JSON request
+        let mut request = Request::new(Body::empty());
+        request
+            .headers_mut()
+            .append(ACCEPT, HeaderValue::from_static(APPLICATION_JSON));
+        *request.uri_mut() = uri;
+
+        let response = self.http.request(request).await?;
+        let headers = response.headers();
+
+        // Verify the length of the data
+        let length_str = headers.get(CONTENT_LENGTH).ok_or(Error::FailedFetch)?;
+        let length: u16 = length_str.to_str()?.parse()?;
+        if length >= 1024 {
+            return Err(Error::TooLarge);
+        }
+
+        // Verify that the content type is JSON
+        let mime = headers.get(CONTENT_TYPE).ok_or(Error::FailedFetch)?.to_str()?;
+        if mime != APPLICATION_JSON {
+            return Err(Error::Data);
+        }
+
+        // Finally commit resources to parsing the JSON
+        let buf = body::aggregate(response.into_body()).await?.reader();
         let Quiz {
             question,
             choices,

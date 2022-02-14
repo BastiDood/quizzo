@@ -1,5 +1,9 @@
+use hyper::http::{header::ToStrError, uri::InvalidUri};
 use serde_json::error::Category;
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    num::ParseIntError,
+};
 
 pub enum Error {
     UnsupportedInteraction,
@@ -14,12 +18,32 @@ pub enum Error {
     Syntax,
     /// Unexpected data types encountered.
     Data,
+    /// JSON payload too large.
+    TooLarge,
     Unrecoverable,
+}
+
+impl From<ParseIntError> for Error {
+    fn from(_: ParseIntError) -> Self {
+        Self::Data
+    }
 }
 
 impl From<hyper::Error> for Error {
     fn from(_: hyper::Error) -> Self {
         Self::FailedFetch
+    }
+}
+
+impl From<ToStrError> for Error {
+    fn from(_: ToStrError) -> Self {
+        Self::Data
+    }
+}
+
+impl From<InvalidUri> for Error {
+    fn from(_: InvalidUri) -> Self {
+        Self::InvalidUri
     }
 }
 
@@ -46,6 +70,7 @@ impl Display for Error {
             FailedFetch => "Failed to fetch the JSON data.",
             Syntax => "Syntax error in JSON detected.",
             Data => "Unexpected data types detected.",
+            TooLarge => "JSON payload is too large. Try sending something less than a kilobyte?",
             Unrecoverable => "Oops! We have encountered an unrecoverable error on our end.",
         })
     }

@@ -2,7 +2,10 @@ use hyper::{
     header::{HeaderValue, CONTENT_TYPE},
     Body, Response, Server,
 };
-use quizzo::{lobby::Lobby, service};
+use quizzo::{
+    lobby::{Lobby, APPLICATION_JSON},
+    service,
+};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,
@@ -40,7 +43,7 @@ fn main() -> anyhow::Result<()> {
                             let mut response = Response::new(Body::from(bytes));
                             response
                                 .headers_mut()
-                                .append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                                .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
                             response
                         }
                         Err(code) => {
