@@ -194,10 +194,7 @@ impl Lobby {
                 .await?;
 
             // Generate congratulations
-            let winners: Vec<_> = selections
-                .into_iter()
-                .map(|user| format!("<@{user}>"))
-                .collect();
+            let winners: Vec<_> = selections.into_iter().map(|user| format!("<@{user}>")).collect();
             let content = if winners.is_empty() {
                 format!("The correct answer is: ||{correct}||. Nobody got it right...")
             } else {
@@ -230,16 +227,16 @@ impl Lobby {
                 value: i.to_string(),
             })
             .collect();
-        let comps = Vec::from([Component::ActionRow(ActionRow {
-            components: Vec::from([Component::SelectMenu(SelectMenu {
+        let comps = vec![Component::ActionRow(ActionRow {
+            components: vec![Component::SelectMenu(SelectMenu {
                 options,
                 custom_id: quiz_id.to_string(),
                 placeholder: Some(String::from("Your Selection")),
                 disabled: false,
                 min_values: Some(1),
                 max_values: Some(1),
-            })]),
-        })]);
+            })],
+        })];
         Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
             content: Some(question),
             components: Some(comps),
