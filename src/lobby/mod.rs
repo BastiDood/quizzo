@@ -2,7 +2,7 @@ mod error;
 
 use crate::quiz::Quiz;
 use error::{Error, Result};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use hyper::{
     body::{self, Buf},
@@ -162,16 +162,21 @@ impl Lobby {
         let app_id = self.app;
         tokio::spawn(async move {
             // Keep processing new answers
-            let mut selections = HashMap::new();
+            let mut selections = HashSet::new();
             let timer = time::sleep(Duration::from_secs(timeout.into()));
             tokio::pin!(timer);
             loop {
-                tokio::select! {
+                let (user, choice) = tokio::select! {
                     biased;
-                    Some((user, choice)) = rx.recv() => selections.insert(user, choice),
+                    Some(pair) = rx.recv() => pair,
                     _ = &mut timer => break,
                     else => anyhow::bail!("unreachable state encountered"),
                 };
+                if choice == answer {
+                    selections.insert(user);
+                } else {
+                    selections.remove(&user);
+                }
             }
 
             // Disable all communication channels
@@ -191,7 +196,7 @@ impl Lobby {
             // Generate congratulations
             let winners: Vec<_> = selections
                 .into_iter()
-                .filter_map(|(user, choice)| if choice == answer { Some(format!("<@{user}>")) } else { None })
+                .map(|user| format!("<@{user}>"))
                 .collect();
             let content = if winners.is_empty() {
                 format!("The correct answer is: ||{correct}||. Nobody got it right...")
