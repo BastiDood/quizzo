@@ -11,8 +11,8 @@ type ArcSlice = Arc<[u8]>;
 type PublicKey = UnparsedPublicKey<ArcSlice>;
 pub async fn try_respond<B: HttpBody>(
     req: Request<B>,
-    lobby: &Lobby,
-    public: &PublicKey,
+    lobby: Lobby,
+    public: PublicKey,
 ) -> Result<Vec<u8>, StatusCode> {
     // Disable all non-`POST` requests
     if req.method() != Method::POST {

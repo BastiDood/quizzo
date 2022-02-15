@@ -1,3 +1,4 @@
+use futures_util::{FutureExt, TryFutureExt};
 use hyper::Server;
 use quizzo::{lobby::Lobby, service};
 use ring::signature::{UnparsedPublicKey, ED25519};
@@ -30,12 +31,9 @@ fn main() -> anyhow::Result<()> {
             future::ready(Ok::<_, Infallible>(hyper::service::service_fn(move |req| {
                 let lobby_inner = lobby_outer.clone();
                 let public_inner = public_outer.clone();
-                async move {
-                    let response = service::try_respond(req, &lobby_inner, &public_inner)
-                        .await
-                        .map_or_else(service::resolve_error_code, service::resolve_json_bytes);
-                    Ok::<_, Infallible>(response)
-                }
+                service::try_respond(req, lobby_inner, public_inner)
+                    .map_ok_or_else(service::resolve_error_code, service::resolve_json_bytes)
+                    .map(Ok::<_, Infallible>)
             })))
         });
         Server::bind(&addr).serve(service).await
