@@ -37,21 +37,22 @@ fn main() -> anyhow::Result<()> {
                 let lobby_inner = lobby_outer.clone();
                 let public_inner = public_outer.clone();
                 async move {
-                    let future = service::try_respond(req, &lobby_inner, &public_inner);
-                    let response = match future.await {
-                        Ok(bytes) => {
-                            let mut response = Response::new(Body::from(bytes));
-                            response
-                                .headers_mut()
-                                .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
-                            response
-                        }
-                        Err(code) => {
-                            let mut response = Response::new(Body::empty());
-                            *response.status_mut() = code;
-                            response
-                        }
-                    };
+                    let response = service::try_respond(req, &lobby_inner, &public_inner)
+                        .await
+                        .map_or_else(
+                            |code| {
+                                let mut response = Response::new(Body::empty());
+                                *response.status_mut() = code;
+                                response
+                            },
+                            |bytes| {
+                                let mut response = Response::new(Body::from(bytes));
+                                response
+                                    .headers_mut()
+                                    .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
+                                response
+                            },
+                        );
                     Ok::<_, Infallible>(response)
                 }
             })))
