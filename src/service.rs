@@ -29,9 +29,9 @@ pub async fn try_respond<B: HttpBody>(
     let maybe_sig = headers.get("X-Signature-Ed25519").and_then(|val| val.to_str().ok());
     let maybe_time = headers.get("X-Signature-Timestamp").and_then(|val| val.to_str().ok());
     let (sig, timestamp) = maybe_sig.zip(maybe_time).ok_or(StatusCode::BAD_REQUEST)?;
+    let signature = hex::decode(sig).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Verify security headers
-    let signature = hex::decode(sig).map_err(|_| StatusCode::BAD_REQUEST)?;
     let mut message = timestamp.as_bytes().to_vec();
     let bytes = body::to_bytes(req.into_body())
         .await
@@ -40,10 +40,11 @@ pub async fn try_respond<B: HttpBody>(
     public
         .verify(&message, &signature)
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    drop(message);
+    drop(signature);
+    drop(public);
 
     // Parse incoming interaction
-    drop(signature);
-    drop(message);
     let interaction = serde_json::from_slice(&bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
     drop(bytes);
 
