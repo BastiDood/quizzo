@@ -1,14 +1,19 @@
-use super::lobby::Lobby;
+use super::lobby::{Lobby, APPLICATION_JSON};
 use hyper::{
     body::{self, HttpBody},
-    Method, Request, StatusCode, Uri,
+    header::{HeaderValue, CONTENT_TYPE},
+    Body, Method, Request, Response, StatusCode, Uri,
 };
 use ring::signature::UnparsedPublicKey;
 use std::sync::Arc;
 
 type ArcSlice = Arc<[u8]>;
 type PublicKey = UnparsedPublicKey<ArcSlice>;
-pub async fn try_respond<B: HttpBody>(req: Request<B>, lobby: &Lobby, public: &PublicKey) -> Result<Vec<u8>, StatusCode> {
+pub async fn try_respond<B: HttpBody>(
+    req: Request<B>,
+    lobby: &Lobby,
+    public: &PublicKey,
+) -> Result<Vec<u8>, StatusCode> {
     // Disable all non-`POST` requests
     if req.method() != Method::POST {
         return Err(StatusCode::METHOD_NOT_ALLOWED);
@@ -46,4 +51,18 @@ pub async fn try_respond<B: HttpBody>(req: Request<B>, lobby: &Lobby, public: &P
     let reply = lobby.on_interaction(interaction).await;
     let bytes = serde_json::to_vec(&reply).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(bytes)
+}
+
+pub fn resolve_json_bytes(bytes: Vec<u8>) -> Response<Body> {
+    let mut response = Response::new(Body::from(bytes));
+    response
+        .headers_mut()
+        .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
+    response
+}
+
+pub fn resolve_error_code(code: StatusCode) -> Response<Body> {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = code;
+    response
 }

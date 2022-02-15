@@ -1,11 +1,5 @@
-use hyper::{
-    header::{HeaderValue, CONTENT_TYPE},
-    Body, Response, Server,
-};
-use quizzo::{
-    lobby::{Lobby, APPLICATION_JSON},
-    service,
-};
+use hyper::Server;
+use quizzo::{lobby::Lobby, service};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,
@@ -39,20 +33,7 @@ fn main() -> anyhow::Result<()> {
                 async move {
                     let response = service::try_respond(req, &lobby_inner, &public_inner)
                         .await
-                        .map_or_else(
-                            |code| {
-                                let mut response = Response::new(Body::empty());
-                                *response.status_mut() = code;
-                                response
-                            },
-                            |bytes| {
-                                let mut response = Response::new(Body::from(bytes));
-                                response
-                                    .headers_mut()
-                                    .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
-                                response
-                            },
-                        );
+                        .map_or_else(service::resolve_error_code, service::resolve_json_bytes);
                     Ok::<_, Infallible>(response)
                 }
             })))
