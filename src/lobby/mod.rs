@@ -4,14 +4,13 @@ use crate::quiz::Quiz;
 use error::{Error, Result};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
+use dashmap::DashMap;
 use hyper::{
     body::{self, Buf},
     header::{HeaderValue, ACCEPT, CONTENT_LENGTH, CONTENT_TYPE},
     Body, Request,
 };
 use hyper_trust_dns::RustlsHttpsConnector;
-use parking_lot::RwLock;
-use slab::Slab;
 use tokio::{sync::mpsc, time};
 
 use twilight_model::{
@@ -25,7 +24,7 @@ use twilight_model::{
     },
     channel::message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags},
     id::{
-        marker::{ApplicationMarker, UserMarker},
+        marker::{ApplicationMarker, InteractionMarker, UserMarker},
         Id,
     },
 };
@@ -34,7 +33,7 @@ pub const APPLICATION_JSON: &str = "application/json";
 
 type Event = (Id<UserMarker>, usize);
 type Channel = mpsc::UnboundedSender<Event>;
-type QuizRegistry = RwLock<Slab<Channel>>;
+type QuizRegistry = DashMap<Id<InteractionMarker>, Channel>;
 
 #[derive(Clone)]
 pub struct Lobby {
@@ -154,7 +153,7 @@ impl Lobby {
 
         // Open channel to receiving new answers
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let quiz_id = self.quizzes.write().insert(tx);
+        self.quizzes.insert(comm.id, tx);
 
         // Spawn external Tokio task for handling incoming responses
         let api = Arc::clone(&self.api);
@@ -181,7 +180,7 @@ impl Lobby {
 
             // Disable all communication channels
             drop(rx);
-            quizzes.write().remove(quiz_id);
+            quizzes.remove(&comm.id);
             drop(quizzes);
 
             // Disable components from original message
@@ -230,7 +229,7 @@ impl Lobby {
         let comps = vec![Component::ActionRow(ActionRow {
             components: vec![Component::SelectMenu(SelectMenu {
                 options,
-                custom_id: quiz_id.to_string(),
+                custom_id: comm.id.to_string(),
                 placeholder: Some(String::from("Your Selection")),
                 disabled: false,
                 min_values: Some(1),
@@ -249,7 +248,6 @@ impl Lobby {
 
     /// Responds to message component interactions.
     async fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> Result<InteractionResponse> {
-        let quiz_id = msg.data.custom_id.parse().map_err(|_| Error::Unrecoverable)?;
         let user = msg
             .member
             .and_then(|m| m.user)
@@ -263,9 +261,9 @@ impl Lobby {
         let choice = arg.parse().map_err(|_| Error::Data)?;
         drop(arg);
 
+        let quiz_id: Id<InteractionMarker> = msg.data.custom_id.parse().map_err(|_| Error::Unrecoverable)?;
         self.quizzes
-            .read()
-            .get(quiz_id)
+            .get(&quiz_id)
             .ok_or(Error::UnknownQuiz)?
             .send((user, choice))
             .map_err(|_| Error::Unrecoverable)?;

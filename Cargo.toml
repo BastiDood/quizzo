@@ -6,10 +6,9 @@ resolver = "2"
 
 [dependencies]
 anyhow = "1"
+dashmap = { version = "5.1", default-features = false }
 futures-util = { version = "0.3", default-features = false }
-parking_lot = { version = "0.12", default-features = false }
 ring = { version = "0.16", default-features = false }
-slab = { version = "0.4", default-features = false }
 serde_json = "1"
 twilight-model = { version = "0.9", default-features = false }
 
