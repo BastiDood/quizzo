@@ -16,7 +16,7 @@ use tokio::{sync::mpsc, time};
 use twilight_model::{
     application::{
         callback::{CallbackData, InteractionResponse},
-        component::{select_menu::SelectMenuOption, ActionRow, Component, SelectMenu},
+        component::{select_menu::SelectMenuOption, ActionRow, Component, ComponentType, SelectMenu},
         interaction::{
             application_command::{CommandDataOption, CommandOptionValue},
             ApplicationCommand, Interaction, MessageComponentInteraction,
@@ -248,6 +248,10 @@ impl Lobby {
 
     /// Responds to message component interactions.
     async fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> Result<InteractionResponse> {
+        if !matches!(msg.data.component_type, ComponentType::SelectMenu) {
+            return Err(Error::UnsupportedInteraction);
+        }
+
         let user = msg
             .member
             .and_then(|m| m.user)
