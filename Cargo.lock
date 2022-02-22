@@ -19,9 +19,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.54"
+version = "1.0.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a99269dff3bc004caa411f38845c20303f1e393ca2bd6581576fa3a7f59577d"
+checksum = "159bb86af3a200e19a068f4224eae4c8bb2d0fa054c7e5d1cacd5cef95e684cd"
 
 [[package]]
 name = "async-trait"
@@ -1141,9 +1141,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-model"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddc1ea478c0e6111415cdb0c5b566a769987ccb886815328c077e86b30c904f4"
+checksum = "c50283cfe1a01c268899a29e3318de4f60b9877be6cc8e434e65c5d3ec95d49e"
 dependencies = [
  "bitflags",
  "serde",
@@ -1154,9 +1154,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-validate"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ef2c0f1b680b4fb1a11261cdff527c8e6c30d442b22f9655f69bb338c9abee5"
+checksum = "b499f9fec4ceff08abe8374acc162c021f593659759653ffe6c86c54fd818390"
 dependencies = [
  "twilight-model",
 ]
