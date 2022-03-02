@@ -1,0 +1,4 @@
+[package]
+name = "quizzo-lobby"
+version = "0.4.4"
+edition = "2021"

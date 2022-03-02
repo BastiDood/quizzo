@@ -1,8 +1,14 @@
+[workspace]
+members = [
+    "crates/api",
+    "crates/model",
+    "crates/lobby",
+]
+
 [package]
 name = "quizzo"
 version = "0.4.4"
 edition = "2021"
-resolver = "2"
 
 [dependencies]
 anyhow = "1"
