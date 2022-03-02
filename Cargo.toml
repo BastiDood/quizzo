@@ -14,6 +14,7 @@ edition = "2021"
 anyhow = "1"
 dashmap = { version = "5.1", default-features = false }
 futures-util = { version = "0.3", default-features = false }
+model = { path = "./crates/model", package = "quizzo-model" }
 ring = { version = "0.16", default-features = false }
 serde_json = "1"
 twilight-model = { version = "0.9", default-features = false }
@@ -32,11 +33,6 @@ features = ["client", "server"]
 version = "0.3"
 default-features = false
 features = ["https-only", "rustls-http2", "rustls-native"]
-
-[dependencies.serde]
-version = "1"
-default-features = false
-features = ["derive"]
 
 [dependencies.tokio]
 version = "1"

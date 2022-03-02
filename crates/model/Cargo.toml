@@ -2,3 +2,8 @@
 name = "quizzo-model"
 version = "0.4.4"
 edition = "2021"
+
+[dependencies.serde]
+version = "1"
+default-features = false
+features = ["derive"]

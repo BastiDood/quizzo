@@ -1,7 +1,7 @@
 mod error;
 
-use crate::quiz::Quiz;
 use error::{Error, Result};
+use model::Quiz;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use dashmap::DashMap;

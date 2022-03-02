@@ -660,12 +660,27 @@ dependencies = [
  "hex",
  "hyper",
  "hyper-trust-dns",
+ "quizzo-model",
  "ring",
- "serde",
  "serde_json",
  "tokio",
  "twilight-http",
  "twilight-model",
+]
+
+[[package]]
+name = "quizzo-api"
+version = "0.4.4"
+
+[[package]]
+name = "quizzo-lobby"
+version = "0.4.4"
+
+[[package]]
+name = "quizzo-model"
+version = "0.4.4"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
