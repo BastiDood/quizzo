@@ -1,4 +1,4 @@
-use super::lobby::{Lobby, APPLICATION_JSON};
+use super::{Lobby, APPLICATION_JSON};
 use hyper::{
     body::{self, HttpBody},
     header::{HeaderValue, CONTENT_TYPE},

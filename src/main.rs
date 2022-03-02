@@ -1,6 +1,6 @@
 use futures_util::{FutureExt, TryFutureExt};
+use lobby::{Lobby, service};
 use hyper::Server;
-use quizzo::{lobby::Lobby, service};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,

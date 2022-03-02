@@ -2,3 +2,36 @@
 name = "quizzo-lobby"
 version = "0.4.4"
 edition = "2021"
+
+[dependencies]
+anyhow = "1"
+dashmap = { version = "5.1", default-features = false }
+model = { path = "../model", package = "quizzo-model" }
+ring = { version = "0.16", default-features = false }
+serde_json = "1"
+twilight-model = { version = "0.9", default-features = false }
+
+[dependencies.hex]
+version = "0.4"
+default-features = false
+features = ["alloc"]
+
+[dependencies.hyper]
+version = "0.14"
+default-features = false
+features = ["client"]
+
+[dependencies.hyper-trust-dns]
+version = "0.3"
+default-features = false
+features = ["https-only", "rustls-http2", "rustls-native"]
+
+[dependencies.tokio]
+version = "1.17"
+default-features = false
+features = ["macros", "sync", "time"]
+
+[dependencies.twilight-http]
+version = "0.9"
+default-features = false
+features = ["decompression", "rustls-native-roots", "trust-dns"]
