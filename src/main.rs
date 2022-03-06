@@ -36,7 +36,9 @@ fn main() -> anyhow::Result<()> {
                     .map(Ok::<_, Infallible>)
             })))
         });
-        Server::bind(&addr).serve(service).await
+        Server::bind(&addr)
+            .http1_only(true)
+            .serve(service).await
     })?;
     Ok(())
 }
