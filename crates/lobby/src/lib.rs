@@ -15,7 +15,6 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time};
 use twilight_model::{
     application::{
-        callback::{CallbackData, InteractionResponse},
         component::{select_menu::SelectMenuOption, ActionRow, Component, ComponentType, SelectMenu},
         interaction::{
             application_command::{CommandDataOption, CommandOptionValue},
@@ -23,6 +22,7 @@ use twilight_model::{
         },
     },
     channel::message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags},
+    http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
         marker::{ApplicationMarker, InteractionMarker, UserMarker},
         Id,
@@ -69,7 +69,10 @@ impl Lobby {
 
     pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
         let result = match interaction {
-            Interaction::Ping(_) => Ok(InteractionResponse::Pong),
+            Interaction::Ping(_) => Ok(InteractionResponse {
+                kind: twilight_model::http::interaction::InteractionResponseType::Pong,
+                data: None,
+            }),
             Interaction::ApplicationCommand(comm) => self.on_app_comm(*comm).await,
             Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg).await,
             _ => Err(Error::UnsupportedInteraction),
@@ -80,14 +83,21 @@ impl Lobby {
             Err(err) => err.to_string(),
         };
 
-        InteractionResponse::ChannelMessageWithSource(CallbackData {
-            content: Some(text),
-            flags: Some(MessageFlags::EPHEMERAL),
-            tts: None,
-            allowed_mentions: None,
-            components: None,
-            embeds: None,
-        })
+        InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: Some(text),
+                flags: Some(MessageFlags::EPHEMERAL),
+                tts: None,
+                allowed_mentions: None,
+                components: None,
+                embeds: None,
+                attachments: None,
+                choices: None,
+                custom_id: None,
+                title: None,
+            }),
+        }
     }
 
     /// Responds to new application commands.
@@ -186,7 +196,7 @@ impl Lobby {
             // Disable components from original message
             let client = api.interaction(app_id);
             client
-                .update_interaction_original(&comm.token)
+                .update_response(&comm.token)
                 .components(Some(&[]))?
                 .exec()
                 .await?;
@@ -203,12 +213,12 @@ impl Lobby {
 
             // Issue follow-up message for winners
             client
-                .create_followup_message(&comm.token)
+                .create_followup(&comm.token)
                 .content(&content)?
-                .allowed_mentions(&AllowedMentions {
+                .allowed_mentions(Some(&AllowedMentions {
                     parse: vec![ParseTypes::Users],
                     ..Default::default()
-                })
+                }))
                 .exec()
                 .await?;
             anyhow::Ok(())
@@ -235,14 +245,22 @@ impl Lobby {
                 max_values: Some(1),
             })],
         })];
-        Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
-            content: Some(question),
-            components: Some(comps),
-            flags: None,
-            tts: None,
-            allowed_mentions: None,
-            embeds: None,
-        }))
+
+        Ok(InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: Some(question),
+                components: Some(comps),
+                flags: None,
+                tts: None,
+                allowed_mentions: None,
+                embeds: None,
+                attachments: None,
+                choices: None,
+                custom_id: None,
+                title: None,
+            }),
+        })
     }
 
     /// Responds to message component interactions.
@@ -271,13 +289,20 @@ impl Lobby {
             .send((user, choice))
             .map_err(|_| Error::Unrecoverable)?;
 
-        Ok(InteractionResponse::ChannelMessageWithSource(CallbackData {
-            content: Some(String::from("We have received your selection.")),
-            flags: Some(MessageFlags::EPHEMERAL),
-            components: None,
-            tts: None,
-            allowed_mentions: None,
-            embeds: None,
-        }))
+        Ok(InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: Some(String::from("We have received your selection.")),
+                flags: Some(MessageFlags::EPHEMERAL),
+                components: None,
+                tts: None,
+                allowed_mentions: None,
+                embeds: None,
+                attachments: None,
+                choices: None,
+                custom_id: None,
+                title: None,
+            }),
+        })
     }
 }
