@@ -2,10 +2,10 @@
 extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 /// Acceptable schema for new questions.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Quiz {
     /// Question to be displayed in chat.
     pub question: String,

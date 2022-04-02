@@ -13,6 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 futures-util = { version = "0.3", default-features = false }
+mongodb = "2.1"
 lobby = { path = "crates/lobby", package = "quizzo-lobby" }
 ring = { version = "0.16", default-features = false }
 
