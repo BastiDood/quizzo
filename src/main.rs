@@ -1,6 +1,9 @@
 use futures_util::{FutureExt, TryFutureExt};
-use hyper::Server;
-use lobby::{service, Lobby};
+use hyper::{
+    header::{HeaderValue, CONTENT_TYPE},
+    Body, Response, Server, StatusCode,
+};
+use lobby::{service, Lobby, APPLICATION_JSON};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use std::{
     convert::Infallible,
@@ -9,6 +12,20 @@ use std::{
     sync::Arc,
 };
 use tokio::runtime::Runtime;
+
+fn resolve_json_bytes(bytes: Vec<u8>) -> Response<Body> {
+    let mut response = Response::new(Body::from(bytes));
+    response
+        .headers_mut()
+        .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
+    response
+}
+
+fn resolve_error_code(code: StatusCode) -> Response<Body> {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = code;
+    response
+}
 
 fn main() -> anyhow::Result<()> {
     // Retrieve the public key
@@ -32,13 +49,11 @@ fn main() -> anyhow::Result<()> {
                 let lobby_inner = lobby_outer.clone();
                 let public_inner = public_outer.clone();
                 service::try_respond(req, lobby_inner, public_inner)
-                    .map_ok_or_else(service::resolve_error_code, service::resolve_json_bytes)
+                    .map_ok_or_else(resolve_error_code, resolve_json_bytes)
                     .map(Ok::<_, Infallible>)
             })))
         });
-        Server::bind(&addr)
-            .http1_only(true)
-            .serve(service).await
+        Server::bind(&addr).http1_only(true).serve(service).await
     })?;
     Ok(())
 }

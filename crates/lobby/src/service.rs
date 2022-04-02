@@ -1,8 +1,7 @@
-use super::{Lobby, APPLICATION_JSON};
+use super::Lobby;
 use hyper::{
     body::{self, HttpBody},
-    header::{HeaderValue, CONTENT_TYPE},
-    Body, Method, Request, Response, StatusCode, Uri,
+    Method, Request, StatusCode, Uri,
 };
 use ring::signature::UnparsedPublicKey;
 use std::sync::Arc;
@@ -48,18 +47,4 @@ pub async fn try_respond<B: HttpBody>(req: Request<B>, lobby: Lobby, public: Pub
     let reply = lobby.on_interaction(interaction).await;
     let bytes = serde_json::to_vec(&reply).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(bytes)
-}
-
-pub fn resolve_json_bytes(bytes: Vec<u8>) -> Response<Body> {
-    let mut response = Response::new(Body::from(bytes));
-    response
-        .headers_mut()
-        .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
-    response
-}
-
-pub fn resolve_error_code(code: StatusCode) -> Response<Body> {
-    let mut response = Response::new(Body::empty());
-    *response.status_mut() = code;
-    response
 }
