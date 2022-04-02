@@ -158,6 +158,11 @@ impl Lobby {
             timeout,
             answer,
         } = serde_json::from_reader(buf)?;
+
+        if !(1..=25).contains(&choices.len()) {
+            return Err(Error::InvalidParams);
+        }
+
         let answer = usize::from(answer);
         let correct = choices.get(answer).ok_or(Error::Data)?.clone().into_boxed_str();
 
