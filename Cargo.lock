@@ -932,6 +932,7 @@ dependencies = [
  "hex",
  "hyper",
  "mongodb",
+ "quizzo-api",
  "quizzo-lobby",
  "ring",
  "tokio",
@@ -941,9 +942,10 @@ dependencies = [
 name = "quizzo-api"
 version = "0.4.4"
 dependencies = [
- "http",
+ "hyper",
  "mongodb",
  "quizzo-model",
+ "serde_json",
 ]
 
 [[package]]

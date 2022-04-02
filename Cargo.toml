@@ -11,6 +11,7 @@ version = "0.4.4"
 edition = "2021"
 
 [dependencies]
+api = { path = "crates/api", package = "quizzo-api" }
 anyhow = "1"
 futures-util = { version = "0.3", default-features = false }
 mongodb = "2.1"
