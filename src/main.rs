@@ -42,10 +42,11 @@ fn main() -> anyhow::Result<()> {
     let lobby = Lobby::new(token, app);
     let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
     Runtime::new()?.block_on(async move {
-        let service = hyper::service::make_service_fn(move |_| {
+        use hyper::service::{make_service_fn, service_fn};
+        let service = make_service_fn(move |_| {
             let lobby_outer = lobby.clone();
             let public_outer = public.clone();
-            future::ready(Ok::<_, Infallible>(hyper::service::service_fn(move |req| {
+            future::ready(Ok::<_, Infallible>(service_fn(move |req| {
                 let lobby_inner = lobby_outer.clone();
                 let public_inner = public_outer.clone();
                 service::try_respond(req, lobby_inner, public_inner)
