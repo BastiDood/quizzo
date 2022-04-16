@@ -49,7 +49,6 @@ pub struct Lobby {
 }
 
 impl Lobby {
-    const CREATE_NAME: &'static str = "create";
     const PARAM_NAME: &'static str = "url";
 
     pub fn new(token: String, app: Id<ApplicationMarker>) -> Self {
@@ -102,11 +101,14 @@ impl Lobby {
     }
 
     /// Responds to new application commands.
-    async fn on_app_comm(&self, mut comm: ApplicationCommand) -> Result<InteractionResponse> {
-        if comm.data.name.as_str() != Self::CREATE_NAME {
-            return Err(Error::UnknownCommandName);
+    async fn on_app_comm(&self, comm: ApplicationCommand) -> Result<InteractionResponse> {
+        match comm.data.name.as_str() {
+            "create" => self.on_create_command(comm).await,
+            _ => Err(Error::UnknownCommandName),
         }
+    }
 
+    async fn on_create_command(&self, mut comm: ApplicationCommand) -> Result<InteractionResponse> {
         // NOTE: We pop off the values to attain O(1) removal time.
         // This does mean that the validation will fail if there are more
         // than one arguments supplied. This should be alright for now since
