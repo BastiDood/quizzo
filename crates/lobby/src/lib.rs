@@ -1,6 +1,7 @@
 pub mod service;
 
 mod error;
+mod validator;
 
 use dashmap::DashMap;
 use error::{Error, Result};
@@ -126,6 +127,10 @@ impl Lobby {
         drop(name);
         let uri = value.parse()?;
         drop(value);
+
+        if validator::is_allowed_uri(&uri) {
+            return Err(Error::InvalidUri);
+        }
 
         // Construct JSON request
         let mut request = Request::new(Body::empty());
