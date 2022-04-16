@@ -22,7 +22,7 @@ use twilight_model::{
             ApplicationCommand, Interaction, MessageComponentInteraction,
         },
     },
-    channel::message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags},
+    channel::{message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags}, embed::{Embed, EmbedField}},
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
         marker::{ApplicationMarker, InteractionMarker, UserMarker},
@@ -104,6 +104,7 @@ impl Lobby {
     async fn on_app_comm(&self, comm: ApplicationCommand) -> Result<InteractionResponse> {
         match comm.data.name.as_str() {
             "create" => self.on_create_command(comm).await,
+            "help" => Ok(Self::on_help_command()),
             _ => Err(Error::UnknownCommandName),
         }
     }
@@ -273,6 +274,51 @@ impl Lobby {
                 title: None,
             }),
         })
+    }
+
+    fn on_help_command() -> InteractionResponse {
+        InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: None,
+                flags: Some(MessageFlags::EPHEMERAL),
+                components: None,
+                tts: None,
+                allowed_mentions: None,
+                embeds: Some(Vec::from([
+                    Embed {
+                        author: None,
+                        color: None,
+                        footer: None,
+                        image: None,
+                        provider: None,
+                        thumbnail: None,
+                        timestamp: None,
+                        url: None,
+                        video: None,
+                        kind: String::from("rich"),
+                        title: Some(String::from("Quizzo Commands")),
+                        description: Some(String::from("Available commands for Quizzo.")),
+                        fields: Vec::from([
+                            EmbedField {
+                                name: String::from("`/create url`"),
+                                value: String::from("Start a quiz at the given URL. Only accepts attachment URIs from Discord's CDN."),
+                                inline: false,
+                            },
+                            EmbedField {
+                                name: String::from("`/help`"),
+                                value: String::from("Summon this help menu!"),
+                                inline: false,
+                            },
+                        ]),
+                    },
+                ])),
+                attachments: None,
+                choices: None,
+                custom_id: None,
+                title: None,
+            }),
+        }
     }
 
     /// Responds to message component interactions.
