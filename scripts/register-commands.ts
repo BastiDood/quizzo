@@ -11,25 +11,31 @@ const endpoint = GUILD_ID
     : `https://discord.com/api/v9/applications/${APP_ID}/commands`;
 
 const response = await fetch(endpoint, {
-    method: 'POST',
+    method: 'PUT',
     headers: {
         Authorization: `Bot ${TOKEN}`,
         'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-        name: 'create',
-        description: 'Create a new quiz from JSON data.',
-        options: [
-            {
-                type: 3,
-                name: 'url',
-                description: 'URL from which to retrieve the JSON data.',
-                required: true,
-                min_value: 1,
-                max_value: 1,
-            }
-        ],
-    }),
+    body: JSON.stringify([
+        {
+            name: 'create',
+            description: 'Create a new quiz from JSON data.',
+            options: [
+                {
+                    type: 3,
+                    name: 'url',
+                    description: 'URL from which to retrieve the JSON data.',
+                    required: true,
+                    min_value: 1,
+                    max_value: 1,
+                }
+            ],
+        },
+        {
+            name: 'help',
+            description: 'Summon a help menu. Will be sent to you via a temporary message.',
+        },
+    ]),
 });
 
 const json = await response.json();
