@@ -130,7 +130,7 @@ impl Lobby {
         let uri = value.parse()?;
         drop(value);
 
-        if validator::is_allowed_uri(&uri) {
+        if !validator::is_allowed_uri(&uri) {
             return Err(Error::InvalidUri);
         }
 
