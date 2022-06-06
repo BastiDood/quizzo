@@ -6,5 +6,5 @@ edition = "2021"
 [dependencies]
 hyper = { version = "0.14", default-features = false }
 model = { path = "../model", package = "quizzo-model" }
-mongodb = "2.1"
+mongodb = "2.2"
 serde_json = "1"

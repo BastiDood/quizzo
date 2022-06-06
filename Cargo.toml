@@ -14,7 +14,7 @@ edition = "2021"
 api = { path = "crates/api", package = "quizzo-api" }
 anyhow = "1"
 futures-util = { version = "0.3", default-features = false }
-mongodb = "2.1"
+mongodb = "2.2"
 lobby = { path = "crates/lobby", package = "quizzo-lobby" }
 ring = { version = "0.16", default-features = false }
 
@@ -29,7 +29,7 @@ default-features = false
 features = ["http1", "server"]
 
 [dependencies.tokio]
-version = "1.17"
+version = "1.19"
 default-features = false
 features = ["rt-multi-thread", "parking_lot"]
 

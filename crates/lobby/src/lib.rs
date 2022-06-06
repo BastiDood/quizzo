@@ -10,7 +10,7 @@ use hyper::{
     header::{HeaderValue, ACCEPT, CONTENT_LENGTH, CONTENT_TYPE},
     Body, Request,
 };
-use hyper_trust_dns::RustlsHttpsConnector;
+use hyper_trust_dns::{RustlsHttpsConnector, TrustDnsResolver};
 use model::Quiz;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time};
@@ -22,7 +22,10 @@ use twilight_model::{
             ApplicationCommand, Interaction, MessageComponentInteraction,
         },
     },
-    channel::{message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags}, embed::{Embed, EmbedField}},
+    channel::{
+        embed::{Embed, EmbedField},
+        message::{allowed_mentions::ParseTypes, AllowedMentions, MessageFlags},
+    },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
         marker::{ApplicationMarker, InteractionMarker, UserMarker},
@@ -56,7 +59,7 @@ impl Lobby {
         let api = Arc::new(twilight_http::Client::new(token));
 
         // Initialize HTTP client for fetching JSON
-        let connector = hyper_trust_dns::new_rustls_native_https_connector();
+        let connector = TrustDnsResolver::default().into_rustls_native_https_connector();
         let http = hyper::Client::builder().http2_only(true).build(connector);
 
         Self {
@@ -285,34 +288,34 @@ impl Lobby {
                 components: None,
                 tts: None,
                 allowed_mentions: None,
-                embeds: Some(Vec::from([
-                    Embed {
-                        author: None,
-                        color: None,
-                        footer: None,
-                        image: None,
-                        provider: None,
-                        thumbnail: None,
-                        timestamp: None,
-                        url: None,
-                        video: None,
-                        kind: String::from("rich"),
-                        title: Some(String::from("Quizzo Commands")),
-                        description: Some(String::from("Available commands for Quizzo.")),
-                        fields: Vec::from([
-                            EmbedField {
-                                name: String::from("`/create url`"),
-                                value: String::from("Start a quiz at the given URL. Only accepts attachment URIs from Discord's CDN."),
-                                inline: false,
-                            },
-                            EmbedField {
-                                name: String::from("`/help`"),
-                                value: String::from("Summon this help menu!"),
-                                inline: false,
-                            },
-                        ]),
-                    },
-                ])),
+                embeds: Some(Vec::from([Embed {
+                    author: None,
+                    color: None,
+                    footer: None,
+                    image: None,
+                    provider: None,
+                    thumbnail: None,
+                    timestamp: None,
+                    url: None,
+                    video: None,
+                    kind: String::from("rich"),
+                    title: Some(String::from("Quizzo Commands")),
+                    description: Some(String::from("Available commands for Quizzo.")),
+                    fields: Vec::from([
+                        EmbedField {
+                            name: String::from("`/create url`"),
+                            value: String::from(
+                                "Start a quiz at the given URL. Only accepts attachment URIs from Discord's CDN.",
+                            ),
+                            inline: false,
+                        },
+                        EmbedField {
+                            name: String::from("`/help`"),
+                            value: String::from("Summon this help menu!"),
+                            inline: false,
+                        },
+                    ]),
+                }])),
                 attachments: None,
                 choices: None,
                 custom_id: None,

@@ -542,10 +542,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a157bb38e071c05e20f77c444f5b232e4e23900eb6f6cf726f97ea9f69bf20c2"
 dependencies = [
  "hyper",
- "hyper-rustls",
  "log",
  "tokio",
  "trust-dns-resolver 0.20.4",
+]
+
+[[package]]
+name = "hyper-trust-dns"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "553f8b30825d27c3af152a4ff7e743c84551f7be1b9cc6c9b367e21c87e2bf27"
+dependencies = [
+ "hyper",
+ "hyper-rustls",
+ "tokio",
+ "trust-dns-resolver 0.21.2",
 ]
 
 [[package]]
@@ -958,7 +969,7 @@ dependencies = [
  "dashmap",
  "hex",
  "hyper",
- "hyper-trust-dns",
+ "hyper-trust-dns 0.4.2",
  "quizzo-model",
  "ring",
  "serde_json",
@@ -1494,7 +1505,19 @@ checksum = "5d0ecdcb44a79f0fe9844f0c4f33a342cbcbb5117de8001e6ba0dc2351327d09"
 dependencies = [
  "cfg-if",
  "pin-project-lite",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc6b8ad3567499f98a1db7a752b07a7c8c7c7c34c332ec00effb2b0027974b7c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1604,19 +1627,20 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "twilight-http"
-version = "0.10.3"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f46658481a90f916ab55e16d5fb0562b515fd90fa266b26c8a24441477da58c2"
+checksum = "c02713ac747c27448be764d6629dcf4d07fbcd8fc855096b6e0ab6717c685be0"
 dependencies = [
  "brotli",
  "hyper",
  "hyper-rustls",
- "hyper-trust-dns",
+ "hyper-trust-dns 0.3.1",
  "percent-encoding",
  "rand",
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
  "twilight-http-ratelimiting",
  "twilight-model",
  "twilight-validate",
@@ -1624,33 +1648,35 @@ dependencies = [
 
 [[package]]
 name = "twilight-http-ratelimiting"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b7170db8bba3b5c909f63b2386eed8a5794e2aeef9b3b9a8fb42932f961ad2"
+checksum = "f8329e421d810eb18ddd41c3c1b78cbc6cd9e82b70850ac3f70d4e6d93e9ff72"
 dependencies = [
  "futures-util",
  "http",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
 name = "twilight-model"
-version = "0.10.3"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "562f94262027517a14e196e0295f58188bb269953c51235e31d5f5d5295a7a94"
+checksum = "c44d87f62a032ea0d8053481672844cab0115330d99d655791be94a31d585256"
 dependencies = [
  "bitflags",
  "serde",
  "serde-value",
  "serde_repr",
  "time 0.3.9",
+ "tracing",
 ]
 
 [[package]]
 name = "twilight-validate"
-version = "0.10.3"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "691006702c89f582553c8e2fa8a7fdd513be77eecd19cf8d174d6d773e0a3b1a"
+checksum = "4d8ee22c7e5321064abdd9ad1c6a7f0a7502db11db018a2f72326c9314bcea41"
 dependencies = [
  "twilight-model",
 ]
