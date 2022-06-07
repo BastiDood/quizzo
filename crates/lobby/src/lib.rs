@@ -60,7 +60,7 @@ impl Lobby {
 
         // Initialize HTTP client for fetching JSON
         let connector = TrustDnsResolver::default().into_rustls_native_https_connector();
-        let http = hyper::Client::builder().http2_only(true).build(connector);
+        let http = hyper::Client::builder().build(connector);
 
         Self {
             app,

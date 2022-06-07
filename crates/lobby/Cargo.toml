@@ -19,12 +19,12 @@ features = ["alloc"]
 [dependencies.hyper]
 version = "0.14"
 default-features = false
-features = ["client"]
+features = ["client", "http1"]
 
 [dependencies.hyper-trust-dns]
 version = "0.4"
 default-features = false
-features = ["https-only", "rustls-http2", "rustls-native"]
+features = ["https-only", "rustls-http1", "rustls-native"]
 
 [dependencies.tokio]
 version = "1.19"
