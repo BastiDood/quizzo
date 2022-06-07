@@ -8,7 +8,7 @@ use mongodb::{
 };
 use rand_core::{CryptoRng, RngCore};
 
-pub async fn create_session<BufSize, Rand>(
+pub async fn create_session<Rand>(
     rng: &mut Rand,
     col: &Collection<Result<NonZeroU64, Binary>>,
 ) -> mongodb::error::Result<(ObjectId, Box<str>)>
