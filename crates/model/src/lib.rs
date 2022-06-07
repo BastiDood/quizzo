@@ -2,7 +2,7 @@
 extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Acceptable schema for new questions.
 #[derive(Serialize, Deserialize)]
