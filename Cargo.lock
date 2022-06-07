@@ -955,9 +955,11 @@ dependencies = [
 name = "quizzo-api"
 version = "0.4.4"
 dependencies = [
+ "hex",
  "hyper",
  "mongodb",
  "quizzo-model",
+ "rand_core",
  "serde_json",
 ]
 
