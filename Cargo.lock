@@ -955,12 +955,19 @@ dependencies = [
 name = "quizzo-api"
 version = "0.4.4"
 dependencies = [
- "hex",
  "hyper",
+ "quizzo-db",
+ "quizzo-model",
+ "serde_json",
+]
+
+[[package]]
+name = "quizzo-db"
+version = "0.4.4"
+dependencies = [
+ "hex",
  "mongodb",
  "quizzo-model",
- "rand_core",
- "serde_json",
 ]
 
 [[package]]

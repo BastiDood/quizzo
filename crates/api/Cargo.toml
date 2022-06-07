@@ -4,9 +4,7 @@ version = "0.4.4"
 edition = "2021"
 
 [dependencies]
-hex = { version = "0.4", default-features = false }
-hyper = { version = "0.14", default-features = false }
+db = { path = "../db", package = "quizzo-db" }
 model = { path = "../model", package = "quizzo-model" }
-mongodb = "2.2"
-rand_core = { version = "0.6", default-features = false }
+hyper = { version = "0.14", default-features = false }
 serde_json = "1"
