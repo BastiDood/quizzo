@@ -4,7 +4,7 @@ use hyper::{
     body::{self, Buf},
     Body, Request, StatusCode,
 };
-use model::Quiz;
+use model::quiz::Quiz;
 
 /// Attempts to create a new quiz. Returns the ObjectID of the document.
 async fn try_submit_quiz(db: &QuizzoDatabase, quiz: &Quiz) -> Result<[u8; 12], StatusCode> {

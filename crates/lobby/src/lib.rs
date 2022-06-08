@@ -11,7 +11,7 @@ use hyper::{
     Body, Request,
 };
 use hyper_trust_dns::{RustlsHttpsConnector, TrustDnsResolver};
-use model::Quiz;
+use model::quiz::Quiz;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time};
 use twilight_model::{

@@ -13,7 +13,6 @@ pub fn create_redirect_responder(client_id: &str, redirect_uri: &Uri) -> impl Fn
     }
 }
 
-/// Exchanges an authorization code query for a token request.
 fn parse_code_and_state(query: &str) -> Option<(&str, &str)> {
     let mut code = None;
     let mut state = None;
@@ -34,7 +33,7 @@ fn parse_code_and_state(query: &str) -> Option<(&str, &str)> {
     code.zip(state)
 }
 
-fn exchange_code_for_token<'q>(
+pub fn exchange_code_for_token<'q>(
     id: &str,
     secret: &str,
     redirect_uri: &Uri,

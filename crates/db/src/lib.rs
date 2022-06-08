@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::num::NonZeroU64;
-use model::Quiz;
+use model::quiz::Quiz;
 use mongodb::{
     bson::{doc, oid::ObjectId},
     results::InsertOneResult,
