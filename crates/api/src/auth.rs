@@ -1,15 +1,25 @@
-use hyper::{header::{HeaderValue, CONTENT_TYPE}, Body, Request, Response, StatusCode, Uri};
+use alloc::string::String;
+use hyper::{
+    header::{HeaderValue, InvalidHeaderValue, CONTENT_TYPE},
+    Body, Request, Response, StatusCode, Uri,
+};
 
-pub fn create_redirect_responder(client_id: &str, redirect_uri: &Uri) -> impl Fn(&str) -> Response<()> {
-    let form = alloc::format!(
-        "https://discord.com/api/oauth2/authorize?response_type=code&scope=identify&client_id={client_id}&redirect_uri={redirect_uri}&state="
-    );
-    move |session| {
-        let uri = form.clone() + session;
-        let (mut parts, body) = Response::new(()).into_parts();
+pub struct Redirect(String);
+
+impl Redirect {
+    pub fn new(id: &str, redirect: &Uri) -> Self {
+        let form = alloc::format!(
+            "https://discord.com/api/oauth2/authorize?response_type=code&scope=identify&client_id={id}&redirect_uri={redirect}&state="
+        );
+        Self(form)
+    }
+
+    pub fn try_respond(&self, session: &str) -> Result<Response<Body>, InvalidHeaderValue> {
+        let uri = self.0.clone() + session;
+        let (mut parts, body) = Response::new(Body::empty()).into_parts();
         parts.status = StatusCode::FOUND;
-        parts.headers.insert("Location", HeaderValue::from_str(&uri).unwrap());
-        Response::from_parts(parts, body)
+        parts.headers.insert("Location", HeaderValue::from_str(&uri)?);
+        Ok(Response::from_parts(parts, body))
     }
 }
 
