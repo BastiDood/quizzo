@@ -43,17 +43,19 @@ fn parse_code_and_state(query: &str) -> Option<(&str, &str)> {
     code.zip(state)
 }
 
-pub fn exchange_code_for_token<'q>(
-    id: &str,
-    secret: &str,
-    redirect_uri: &Uri,
-) -> impl Fn(&'q str) -> (Request<Body>, &'q str) {
-    let form = alloc::format!(
-        "grant_type=authorization_code&client_id={id}&client_secret={secret}&redirect_uri={redirect_uri}&code="
-    );
-    move |query| {
+pub struct CodeExchanger(String);
+
+impl CodeExchanger {
+    pub fn new(id: &str, secret: &str, redirect_uri: &Uri) -> Self {
+        let form = alloc::format!(
+            "grant_type=authorization_code&client_id={id}&client_secret={secret}&redirect_uri={redirect_uri}&code="
+        );
+        Self(form)
+    }
+
+    pub fn generate_token_request<'q>(&self, query: &'q str) -> (Request<Body>, &'q str) {
         let (code, state) = parse_code_and_state(query).unwrap();
-        let full = form.clone() + code;
+        let full = self.0.clone() + code;
 
         let mut builder = Request::post("https://discord.com/api/oauth2/token");
         let headers = builder.headers_mut().unwrap();
