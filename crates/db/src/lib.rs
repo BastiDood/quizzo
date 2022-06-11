@@ -1,5 +1,7 @@
 #![no_std]
 
+pub mod error;
+
 use core::num::NonZeroU64;
 use model::quiz::Quiz;
 use mongodb::{
@@ -23,24 +25,20 @@ impl QuizzoDatabase {
         }
     }
 
-    pub async fn create_session(&self) -> mongodb::error::Result<ObjectId> {
+    pub async fn create_session(&self) -> error::Result<ObjectId> {
         let InsertOneResult { inserted_id, .. } = self.sessions.insert_one(None, None).await?;
-        let id = inserted_id.as_object_id().unwrap();
-        Ok(id)
+        inserted_id.as_object_id().ok_or(error::Error::Fatal)
     }
 
-    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> mongodb::error::Result<Session> {
-        let old = self
-            .sessions
+    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> error::Result<Session> {
+        self.sessions
             .find_one_and_replace(doc! { "_id": session }, Some(user.into()), None)
             .await?
-            .unwrap();
-        Ok(old)
+            .ok_or(error::Error::NoDocument)
     }
 
-    pub async fn create_quiz(&self, quiz: &Quiz) -> mongodb::error::Result<ObjectId> {
+    pub async fn create_quiz(&self, quiz: &Quiz) -> error::Result<ObjectId> {
         let InsertOneResult { inserted_id, .. } = self.quizzes.insert_one(quiz, None).await?;
-        let id = inserted_id.as_object_id().unwrap();
-        Ok(id)
+        inserted_id.as_object_id().ok_or(error::Error::Fatal)
     }
 }
