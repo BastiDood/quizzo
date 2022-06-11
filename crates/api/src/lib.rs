@@ -12,6 +12,7 @@ use hyper::{Body, Request, Response, StatusCode};
 
 pub use db::{MongoClient, MongoDb, ObjectId};
 pub use hyper::Uri;
+use model::oauth::TokenResponse;
 
 pub struct App {
     /// Handle to the database collections.
@@ -97,7 +98,17 @@ impl App {
                 let hash_str = core::str::from_utf8(buf.as_slice()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 self.redirector.try_respond(hash_str).map_err(|_| StatusCode::BAD_REQUEST)
             }
-            (Method::GET, "/auth/callback") => todo!(),
+            (Method::GET, "/auth/callback") => {
+                let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
+                let (req, state) = self.exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
+                let body = self.http.request(req).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.into_body();
+
+                use body::Buf;
+                let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
+                let TokenResponse { access, refresh, expires } =
+                    serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                todo!()
+            }
             _ => Err(StatusCode::NOT_FOUND),
         }
     }

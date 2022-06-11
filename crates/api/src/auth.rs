@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use hyper::{
     header::{HeaderValue, InvalidHeaderValue, CONTENT_TYPE},
-    Body, Request, Response, StatusCode, Uri,
+    Body, Method, Request, Response, StatusCode, Uri,
 };
 
 pub struct Redirect(Box<str>);
@@ -16,10 +16,10 @@ impl Redirect {
 
     pub fn try_respond(&self, state: &str) -> Result<Response<Body>, InvalidHeaderValue> {
         let uri = self.0.clone().into_string() + state;
-        let (mut parts, body) = Response::new(Body::empty()).into_parts();
-        parts.status = StatusCode::FOUND;
-        parts.headers.insert("Location", HeaderValue::from_str(&uri)?);
-        Ok(Response::from_parts(parts, body))
+        let mut res = Response::new(Body::empty());
+        *res.status_mut() = StatusCode::FOUND;
+        res.headers_mut().insert("Location", HeaderValue::from_str(&uri)?);
+        Ok(res)
     }
 }
 
@@ -53,15 +53,17 @@ impl CodeExchanger {
         Self(form.into_boxed_str())
     }
 
-    pub fn generate_token_request<'q>(&self, query: &'q str) -> (Request<Body>, &'q str) {
-        let (code, state) = parse_code_and_state(query).unwrap();
+    pub fn generate_token_request<'q>(&self, query: &'q str) -> Option<(Request<Body>, &'q str)> {
+        let (code, state) = parse_code_and_state(query)?;
         let full = self.0.clone().into_string() + code;
 
-        let mut builder = Request::post("https://discord.com/api/oauth2/token");
-        let headers = builder.headers_mut().unwrap();
-        assert!(!headers.append(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"),));
-
         let body = full.into_bytes().into();
-        (builder.body(body).unwrap(), state)
+        let mut req = Request::new(body);
+
+        *req.method_mut() = Method::POST;
+        *req.uri_mut() = Uri::from_static("https://discord.com/api/oauth2/token");
+        assert!(!req.headers_mut().append(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded")));
+
+        Some((req, state))
     }
 }
