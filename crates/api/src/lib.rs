@@ -8,8 +8,9 @@ mod quiz;
 use alloc::string::String;
 use auth::{CodeExchanger, Redirect};
 use db::Database;
+use hyper::{Body, Request, Response, StatusCode};
 
-pub use db::{MongoClient, MongoDb};
+pub use db::{MongoClient, MongoDb, ObjectId};
 pub use hyper::Uri;
 
 pub struct App {
@@ -38,6 +39,62 @@ impl App {
             exchanger: CodeExchanger::new(client_id, client_secret, redirect_uri),
             redirector: Redirect::new(client_id, redirect_uri),
             http,
+        }
+    }
+
+    pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {
+        use hyper::{body, http::request::Parts, Method};
+        let (
+            Parts {
+                uri, method, headers, ..
+            },
+            body,
+        ) = req.into_parts();
+        match (method, uri.path()) {
+            (Method::POST, "/discord") => todo!(),
+            (Method::POST, "/quiz") => {
+                // Retrieve the session from the cookie
+                let (key, session) = headers
+                    .get("Cookie")
+                    .ok_or(StatusCode::UNAUTHORIZED)?
+                    .to_str()
+                    .map_err(|_| StatusCode::BAD_REQUEST)?
+                    .split(';')
+                    .next()
+                    .ok_or(StatusCode::BAD_REQUEST)?
+                    .split_once('=')
+                    .ok_or(StatusCode::BAD_REQUEST)?;
+                if key != "sid" {
+                    return Err(StatusCode::BAD_REQUEST);
+                }
+
+                // Check database if user ID is present
+                let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
+                let user = self
+                    .db
+                    .get_session(oid)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::FORBIDDEN)?;
+
+                // Finally parse the JSON form submission
+                use body::Buf;
+                use model::quiz::Quiz;
+                let reader = body::aggregate(body)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .reader();
+                let submission: Quiz =
+                    serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+                todo!()
+            }
+            (Method::GET, "/auth/login") => {
+                todo!()
+            }
+            (Method::GET, "/auth/callback") => todo!(),
+            _ => Err(StatusCode::NOT_FOUND),
         }
     }
 }

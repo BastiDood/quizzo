@@ -4,8 +4,6 @@ use mongodb::error::{ErrorKind, WriteError, WriteFailure};
 pub enum Error {
     /// The object we are trying to insert already exists.
     AlreadyExists,
-    /// Document not found.
-    NoDocument,
     /// Unrecoverable error.
     Fatal,
 }

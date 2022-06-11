@@ -4,12 +4,9 @@ pub mod error;
 
 use core::num::NonZeroU64;
 use model::quiz::Submission;
-use mongodb::{
-    bson::{doc, oid::ObjectId},
-    results::InsertOneResult,
-    Collection,
-};
+use mongodb::{bson::doc, results::InsertOneResult, Collection};
 
+pub use mongodb::bson::oid::ObjectId;
 pub use mongodb::Client as MongoClient;
 pub use mongodb::Database as MongoDb;
 
@@ -33,11 +30,18 @@ impl Database {
         inserted_id.as_object_id().ok_or(error::Error::Fatal)
     }
 
-    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> error::Result<Session> {
-        self.sessions
+    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> error::Result<Option<Session>> {
+        let maybe_session = self.sessions
             .find_one_and_replace(doc! { "_id": session }, Some(user.into()), None)
-            .await?
-            .ok_or(error::Error::NoDocument)
+            .await?;
+        Ok(maybe_session)
+    }
+
+    pub async fn get_session(&self, session: ObjectId) -> error::Result<Option<Session>> {
+        let maybe_session = self.sessions
+            .find_one(doc! { "_id": session }, None)
+            .await?;
+        Ok(maybe_session)
     }
 
     pub async fn create_quiz(&self, quiz: &Submission) -> error::Result<ObjectId> {
