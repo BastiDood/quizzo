@@ -5,7 +5,7 @@ extern crate alloc;
 mod auth;
 mod quiz;
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use auth::{CodeExchanger, Redirect};
 use db::Database;
 use hyper::{Body, Request, Response, StatusCode};
@@ -91,7 +91,23 @@ impl App {
                 todo!()
             }
             (Method::GET, "/auth/login") => {
-                todo!()
+                // TODO: Verify whether a session already exists.
+
+                use ring::digest;
+                let oid = match self.db.create_session().await {
+                    Ok(oid) => oid.bytes(),
+                    Err(db::error::Error::AlreadyExists) => return Err(StatusCode::FORBIDDEN),
+                    _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+                };
+
+                assert_eq!(oid.len(), 12);
+                let mut buf = [0; 12 * 2];
+                let hash = digest::digest(&digest::SHA256, &oid);
+                hex::encode_to_slice(hash, &mut buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let hash_str = core::str::from_utf8(buf.as_slice()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                self.redirector
+                    .try_respond(hash_str)
+                    .map_err(|_| StatusCode::BAD_REQUEST)
             }
             (Method::GET, "/auth/callback") => todo!(),
             _ => Err(StatusCode::NOT_FOUND),

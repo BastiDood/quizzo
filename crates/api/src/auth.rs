@@ -14,8 +14,8 @@ impl Redirect {
         Self(form.into_boxed_str())
     }
 
-    pub fn try_respond(&self, session: &str) -> Result<Response<Body>, InvalidHeaderValue> {
-        let uri = self.0.clone().into_string() + session;
+    pub fn try_respond(&self, state: &str) -> Result<Response<Body>, InvalidHeaderValue> {
+        let uri = self.0.clone().into_string() + state;
         let (mut parts, body) = Response::new(Body::empty()).into_parts();
         parts.status = StatusCode::FOUND;
         parts.headers.insert("Location", HeaderValue::from_str(&uri)?);
