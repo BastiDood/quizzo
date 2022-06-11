@@ -5,7 +5,7 @@ extern crate alloc;
 mod auth;
 mod quiz;
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use auth::{CodeExchanger, Redirect};
 use db::Database;
 use hyper::{Body, Request, Response, StatusCode};
@@ -29,10 +29,7 @@ pub struct App {
 impl App {
     pub fn new(db: &MongoDb, bot_token: String, client_id: &str, client_secret: &str, redirect_uri: &Uri) -> Self {
         let connector = hyper_trust_dns::TrustDnsResolver::default().into_rustls_native_https_connector();
-        let http = hyper::Client::builder()
-            .http1_max_buf_size(8192)
-            .set_host(false)
-            .build(connector);
+        let http = hyper::Client::builder().http1_max_buf_size(8192).set_host(false).build(connector);
         Self {
             db: Database::new(db),
             discord: twilight_http::Client::new(bot_token),
@@ -44,12 +41,7 @@ impl App {
 
     pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {
         use hyper::{body, http::request::Parts, Method};
-        let (
-            Parts {
-                uri, method, headers, ..
-            },
-            body,
-        ) = req.into_parts();
+        let (Parts { uri, method, headers, .. }, body) = req.into_parts();
         match (method, uri.path()) {
             (Method::POST, "/discord") => todo!(),
             (Method::POST, "/quiz") => {
@@ -81,10 +73,7 @@ impl App {
                 // Finally parse the JSON form submission
                 use body::Buf;
                 use model::quiz::Quiz;
-                let reader = body::aggregate(body)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .reader();
+                let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
                 let submission: Quiz =
                     serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -104,10 +93,9 @@ impl App {
                 let mut buf = [0; 12 * 2];
                 let hash = digest::digest(&digest::SHA256, &oid);
                 hex::encode_to_slice(hash, &mut buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
                 let hash_str = core::str::from_utf8(buf.as_slice()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                self.redirector
-                    .try_respond(hash_str)
-                    .map_err(|_| StatusCode::BAD_REQUEST)
+                self.redirector.try_respond(hash_str).map_err(|_| StatusCode::BAD_REQUEST)
             }
             (Method::GET, "/auth/callback") => todo!(),
             _ => Err(StatusCode::NOT_FOUND),

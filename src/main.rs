@@ -15,9 +15,7 @@ use tokio::runtime::Runtime;
 
 fn resolve_json_bytes(bytes: Vec<u8>) -> Response<Body> {
     let mut response = Response::new(Body::from(bytes));
-    response
-        .headers_mut()
-        .append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
+    response.headers_mut().append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
     response
 }
 

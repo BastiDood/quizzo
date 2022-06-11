@@ -28,13 +28,9 @@ pub async fn try_respond<B: HttpBody>(req: Request<B>, lobby: Lobby, public: Pub
 
     // Verify security headers
     let mut message = timestamp.as_bytes().to_vec();
-    let bytes = body::to_bytes(req.into_body())
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let bytes = body::to_bytes(req.into_body()).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     message.extend_from_slice(&bytes);
-    public
-        .verify(&message, &signature)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    public.verify(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
     drop(message);
     drop(signature);
     drop(public);

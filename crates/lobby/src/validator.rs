@@ -18,11 +18,7 @@ pub fn is_allowed_uri(uri: &Uri) -> bool {
     };
 
     let mut comps = rest.split('/');
-    if !comps
-        .by_ref()
-        .take(2)
-        .all(|comp| comp.as_bytes().iter().all(u8::is_ascii_digit))
-    {
+    if !comps.by_ref().take(2).all(|comp| comp.as_bytes().iter().all(u8::is_ascii_digit)) {
         return false;
     }
 
@@ -66,50 +62,26 @@ mod tests {
 
     #[test]
     fn rejects_invalid_snowflakes() {
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/abc"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/abc/def"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/abc"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/abc/123"
-        )));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/abc")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/abc/def")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/abc")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/abc/123")));
     }
 
     #[test]
     fn rejects_invalid_file_extensions() {
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/456/Question.exe"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/456/Question.so"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/456/Question.sh"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/456/Question.txt"
-        )));
-        assert!(!is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/456/Question.md"
-        )));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/456/Question.exe")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/456/Question.so")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/456/Question.sh")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/456/Question.txt")));
+        assert!(!is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/456/Question.md")));
     }
 
     #[test]
     fn accepts_valid_formats() {
-        assert!(is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/123/456/Question.json"
-        )));
-        assert!(is_allowed_uri(&Uri::from_static(
-            "https://cdn.discordapp.com/attachments/456/789/Template.json"
-        )));
+        assert!(is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/123/456/Question.json")));
+        assert!(is_allowed_uri(&Uri::from_static("https://cdn.discordapp.com/attachments/456/789/Template.json")));
         assert!(is_allowed_uri(&Uri::from_static(
             "https://cdn.discordapp.com/attachments/12203934/90823432/Hello.json"
         )));

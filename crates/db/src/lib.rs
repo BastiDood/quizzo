@@ -19,10 +19,7 @@ pub struct Database {
 
 impl Database {
     pub fn new(db: &MongoDb) -> Self {
-        Self {
-            sessions: db.collection("sessions"),
-            quizzes: db.collection("quizzes"),
-        }
+        Self { sessions: db.collection("sessions"), quizzes: db.collection("quizzes") }
     }
 
     pub async fn create_session(&self) -> error::Result<ObjectId> {
@@ -30,17 +27,18 @@ impl Database {
         inserted_id.as_object_id().ok_or(error::Error::Fatal)
     }
 
-    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> error::Result<Option<Session>> {
-        let maybe_session = self.sessions
-            .find_one_and_replace(doc! { "_id": session }, Some(user.into()), None)
-            .await?;
+    pub async fn upgrade_session(
+        &self,
+        session: ObjectId,
+        user: impl Into<NonZeroU64>,
+    ) -> error::Result<Option<Session>> {
+        let maybe_session =
+            self.sessions.find_one_and_replace(doc! { "_id": session }, Some(user.into()), None).await?;
         Ok(maybe_session)
     }
 
     pub async fn get_session(&self, session: ObjectId) -> error::Result<Option<Session>> {
-        let maybe_session = self.sessions
-            .find_one(doc! { "_id": session }, None)
-            .await?;
+        let maybe_session = self.sessions.find_one(doc! { "_id": session }, None).await?;
         Ok(maybe_session)
     }
 

@@ -21,10 +21,7 @@ async fn try_submit_quiz(db: &Database, sub: &Submission) -> Result<[u8; 12], St
 }
 
 pub async fn try_respond(db: &Database, req: Request<Body>) -> Result<Vec<u8>, StatusCode> {
-    let reader = body::aggregate(req.into_body())
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .reader();
+    let reader = body::aggregate(req.into_body()).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
     let quiz = serde_json::from_reader(reader).map_err(|_| StatusCode::BAD_REQUEST)?;
     let oid = try_submit_quiz(db, &quiz).await?;
     Ok(oid.into())

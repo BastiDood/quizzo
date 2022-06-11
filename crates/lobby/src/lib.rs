@@ -62,12 +62,7 @@ impl Lobby {
         let connector = TrustDnsResolver::default().into_rustls_native_https_connector();
         let http = hyper::Client::builder().build(connector);
 
-        Self {
-            app,
-            api,
-            http,
-            quizzes: Arc::default(),
-        }
+        Self { app, api, http, quizzes: Arc::default() }
     }
 
     pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
@@ -118,11 +113,7 @@ impl Lobby {
         // than one arguments supplied. This should be alright for now since
         // we don't expect the `create` command to accept more than one argument.
         let (name, value) = match comm.data.options.pop() {
-            Some(CommandDataOption {
-                name,
-                value: CommandOptionValue::String(value),
-                ..
-            }) => (name, value),
+            Some(CommandDataOption { name, value: CommandOptionValue::String(value), .. }) => (name, value),
             _ => return Err(Error::InvalidParams),
         };
 
@@ -140,9 +131,7 @@ impl Lobby {
 
         // Construct JSON request
         let mut request = Request::new(Body::empty());
-        request
-            .headers_mut()
-            .append(ACCEPT, HeaderValue::from_static(APPLICATION_JSON));
+        request.headers_mut().append(ACCEPT, HeaderValue::from_static(APPLICATION_JSON));
         *request.uri_mut() = uri;
 
         let response = self.http.request(request).await?;
@@ -163,12 +152,7 @@ impl Lobby {
 
         // Finally commit resources to parsing the JSON
         let buf = body::aggregate(response.into_body()).await?.reader();
-        let Quiz {
-            question,
-            choices,
-            timeout,
-            answer,
-        } = serde_json::from_reader(buf)?;
+        let Quiz { question, choices, timeout, answer } = serde_json::from_reader(buf)?;
 
         if !(1..=25).contains(&choices.len()) {
             return Err(Error::InvalidParams);
@@ -211,11 +195,7 @@ impl Lobby {
 
             // Disable components from original message
             let client = api.interaction(app_id);
-            client
-                .update_response(&comm.token)
-                .components(Some(&[]))?
-                .exec()
-                .await?;
+            client.update_response(&comm.token).components(Some(&[]))?.exec().await?;
 
             // Generate congratulations
             let winners: Vec<_> = selections.into_iter().map(|user| format!("<@{user}>")).collect();
@@ -231,10 +211,7 @@ impl Lobby {
             client
                 .create_followup(&comm.token)
                 .content(&content)?
-                .allowed_mentions(Some(&AllowedMentions {
-                    parse: vec![ParseTypes::Users],
-                    ..Default::default()
-                }))
+                .allowed_mentions(Some(&AllowedMentions { parse: vec![ParseTypes::Users], ..Default::default() }))
                 .exec()
                 .await?;
             anyhow::Ok(())
@@ -330,12 +307,7 @@ impl Lobby {
             return Err(Error::UnsupportedInteraction);
         }
 
-        let user = msg
-            .member
-            .and_then(|m| m.user)
-            .or(msg.user)
-            .ok_or(Error::UnknownUser)?
-            .id;
+        let user = msg.member.and_then(|m| m.user).or(msg.user).ok_or(Error::UnknownUser)?.id;
 
         // Since we know that there can only be one value from this interaction,
         // we simply pop the arguments directly. This allows O(1) deletion.
@@ -344,11 +316,7 @@ impl Lobby {
         drop(arg);
 
         let quiz_id: Id<InteractionMarker> = msg.data.custom_id.parse().map_err(|_| Error::Unrecoverable)?;
-        self.quizzes
-            .get(&quiz_id)
-            .ok_or(Error::UnknownQuiz)?
-            .send((user, choice))
-            .map_err(|_| Error::Unrecoverable)?;
+        self.quizzes.get(&quiz_id).ok_or(Error::UnknownQuiz)?.send((user, choice)).map_err(|_| Error::Unrecoverable)?;
 
         Ok(InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,

@@ -59,10 +59,7 @@ impl CodeExchanger {
 
         let mut builder = Request::post("https://discord.com/api/oauth2/token");
         let headers = builder.headers_mut().unwrap();
-        assert!(!headers.append(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
-        ));
+        assert!(!headers.append(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"),));
 
         let body = full.into_bytes().into();
         (builder.body(body).unwrap(), state)
