@@ -966,6 +966,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "twilight-http",
+ "twilight-model",
 ]
 
 [[package]]
