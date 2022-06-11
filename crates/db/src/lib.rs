@@ -3,22 +3,25 @@
 pub mod error;
 
 use core::num::NonZeroU64;
-use model::quiz::Quiz;
+use model::quiz::Submission;
 use mongodb::{
     bson::{doc, oid::ObjectId},
     results::InsertOneResult,
-    Collection, Database,
+    Collection,
 };
+
+pub use mongodb::Client as MongoClient;
+pub use mongodb::Database as MongoDb;
 
 pub type Session = Option<NonZeroU64>;
 
-pub struct QuizzoDatabase {
+pub struct Database {
     sessions: Collection<Session>,
-    quizzes: Collection<Quiz>,
+    quizzes: Collection<Submission>,
 }
 
-impl QuizzoDatabase {
-    pub fn new(db: &Database) -> Self {
+impl Database {
+    pub fn new(db: &MongoDb) -> Self {
         Self {
             sessions: db.collection("sessions"),
             quizzes: db.collection("quizzes"),
@@ -37,7 +40,7 @@ impl QuizzoDatabase {
             .ok_or(error::Error::NoDocument)
     }
 
-    pub async fn create_quiz(&self, quiz: &Quiz) -> error::Result<ObjectId> {
+    pub async fn create_quiz(&self, quiz: &Submission) -> error::Result<ObjectId> {
         let InsertOneResult { inserted_id, .. } = self.quizzes.insert_one(quiz, None).await?;
         inserted_id.as_object_id().ok_or(error::Error::Fatal)
     }

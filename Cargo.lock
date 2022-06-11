@@ -955,10 +955,17 @@ dependencies = [
 name = "quizzo-api"
 version = "0.4.4"
 dependencies = [
+ "anyhow",
+ "dashmap",
+ "hex",
  "hyper",
+ "hyper-trust-dns 0.4.2",
  "quizzo-db",
  "quizzo-model",
+ "ring",
  "serde_json",
+ "tokio",
+ "twilight-http",
 ]
 
 [[package]]

@@ -1,21 +1,21 @@
-use alloc::string::String;
+use alloc::boxed::Box;
 use hyper::{
     header::{HeaderValue, InvalidHeaderValue, CONTENT_TYPE},
     Body, Request, Response, StatusCode, Uri,
 };
 
-pub struct Redirect(String);
+pub struct Redirect(Box<str>);
 
 impl Redirect {
     pub fn new(id: &str, redirect: &Uri) -> Self {
         let form = alloc::format!(
             "https://discord.com/api/oauth2/authorize?response_type=code&scope=identify&client_id={id}&redirect_uri={redirect}&state="
         );
-        Self(form)
+        Self(form.into_boxed_str())
     }
 
     pub fn try_respond(&self, session: &str) -> Result<Response<Body>, InvalidHeaderValue> {
-        let uri = self.0.clone() + session;
+        let uri = self.0.clone().into_string() + session;
         let (mut parts, body) = Response::new(Body::empty()).into_parts();
         parts.status = StatusCode::FOUND;
         parts.headers.insert("Location", HeaderValue::from_str(&uri)?);
@@ -43,19 +43,19 @@ fn parse_code_and_state(query: &str) -> Option<(&str, &str)> {
     code.zip(state)
 }
 
-pub struct CodeExchanger(String);
+pub struct CodeExchanger(Box<str>);
 
 impl CodeExchanger {
     pub fn new(id: &str, secret: &str, redirect_uri: &Uri) -> Self {
         let form = alloc::format!(
             "grant_type=authorization_code&client_id={id}&client_secret={secret}&redirect_uri={redirect_uri}&code="
         );
-        Self(form)
+        Self(form.into_boxed_str())
     }
 
     pub fn generate_token_request<'q>(&self, query: &'q str) -> (Request<Body>, &'q str) {
         let (code, state) = parse_code_and_state(query).unwrap();
-        let full = self.0.clone() + code;
+        let full = self.0.clone().into_string() + code;
 
         let mut builder = Request::post("https://discord.com/api/oauth2/token");
         let headers = builder.headers_mut().unwrap();

@@ -1,3 +1,5 @@
+use core::num::NonZeroU64;
+
 use alloc::{string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
 
@@ -12,4 +14,13 @@ pub struct Quiz {
     pub answer: u8,
     /// How long to wait before expiring the poll (in seconds).
     pub timeout: u8,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Submission {
+    /// Discord User ID that created this quiz.
+    #[serde(rename = "_id")]
+    pub id: NonZeroU64,
+    /// The actual quiz information.
+    pub quiz: Quiz,
 }
