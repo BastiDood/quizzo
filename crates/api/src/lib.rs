@@ -111,9 +111,24 @@ impl App {
                 let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
                 let TokenResponse { access, refresh, expires } =
                     serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+                // TODO: store OAuth tokens somewhere in the database
+
+                use twilight_model::user::CurrentUser;
+                let client = twilight_http::Client::new(access.into_string());
+                let CurrentUser { id, .. } = client
+                    .current_user()
+                    .exec()
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .model()
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 todo!()
             }
-            _ => Err(StatusCode::NOT_FOUND),
+            (Method::GET, _) => Err(StatusCode::NOT_FOUND),
+            (_, "/discord" | "/quiz" | "/auth/login" | "/auth/callback") => Err(StatusCode::METHOD_NOT_ALLOWED),
+            _ => Err(StatusCode::NOT_IMPLEMENTED),
         }
     }
 }
