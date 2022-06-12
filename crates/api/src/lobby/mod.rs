@@ -66,13 +66,13 @@ impl Lobby {
     /// Responds to new application commands.
     async fn on_app_comm(&self, comm: ApplicationCommand) -> error::Result<InteractionResponse> {
         match comm.data.name.as_str() {
-            "create" => self.on_create_command(comm).await,
+            "start" => self.on_start_command(),
             "help" => Ok(Self::on_help_command()),
             _ => Err(error::Error::UnknownCommandName),
         }
     }
 
-    async fn on_create_command(&self, mut comm: ApplicationCommand) -> error::Result<InteractionResponse> {
+    fn on_start_command(&self) -> error::Result<InteractionResponse> {
         todo!()
     }
 
@@ -124,6 +124,40 @@ impl Lobby {
 
     /// Responds to message component interactions.
     async fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> error::Result<InteractionResponse> {
-        todo!()
+        use twilight_model::{application::component::ComponentType::SelectMenu, user::User};
+        if !matches!(msg.data.component_type, SelectMenu) {
+            return Err(error::Error::UnsupportedInteraction);
+        }
+
+        let User { id, .. } = msg.member.and_then(|m| m.user).or(msg.user).ok_or(error::Error::UnknownUser)?;
+
+        // Since we know that there can only be one value from this interaction,
+        // we simply pop the arguments directly. This allows O(1) deletion.
+        let arg = msg.data.values.pop().ok_or(error::Error::Unrecoverable)?;
+        let choice = arg.parse().map_err(|_| error::Error::Data)?;
+        drop(arg);
+
+        let quiz_id = msg.data.custom_id.parse().map_err(|_| error::Error::Unrecoverable)?;
+        self.quizzes
+            .get(&quiz_id)
+            .ok_or(error::Error::UnknownQuiz)?
+            .send((id, choice))
+            .map_err(|_| error::Error::Unrecoverable)?;
+
+        Ok(InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: Some(String::from("We have received your selection.")),
+                flags: Some(MessageFlags::EPHEMERAL),
+                components: None,
+                tts: None,
+                allowed_mentions: None,
+                embeds: None,
+                attachments: None,
+                choices: None,
+                custom_id: None,
+                title: None,
+            }),
+        })
     }
 }

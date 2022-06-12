@@ -955,7 +955,6 @@ dependencies = [
 name = "quizzo-api"
 version = "0.4.4"
 dependencies = [
- "anyhow",
  "dashmap",
  "hex",
  "hyper",
