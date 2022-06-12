@@ -8,7 +8,7 @@ mod quiz;
 use alloc::{string::String, vec::Vec};
 use auth::{CodeExchanger, Redirect};
 use db::Database;
-use hyper::{Body, Request, Response, StatusCode};
+use hyper::{Body, HeaderMap, Request, Response, StatusCode};
 
 pub use db::{MongoClient, MongoDb, ObjectId};
 pub use hyper::Uri;
@@ -47,18 +47,10 @@ impl App {
             (Method::POST, "/discord") => todo!(),
             (Method::POST, "/quiz") => {
                 // Retrieve the session from the cookie
-                let session = headers
-                    .get("Cookie")
-                    .ok_or(StatusCode::UNAUTHORIZED)?
-                    .to_str()
-                    .map_err(|_| StatusCode::BAD_REQUEST)?
-                    .split(';')
-                    .flat_map(|section| section.split_once('='))
-                    .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
-                    .ok_or(StatusCode::BAD_REQUEST)?;
+                let session = extract_session(&headers)?;
+                let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
                 // Check database if user ID is present
-                let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
                 let user = self
                     .db
                     .get_session(oid)
@@ -100,15 +92,7 @@ impl App {
             }
             (Method::GET, "/auth/callback") => {
                 // Retrieve the session from the cookie
-                let session = headers
-                    .get("Cookie")
-                    .ok_or(StatusCode::UNAUTHORIZED)?
-                    .to_str()
-                    .map_err(|_| StatusCode::BAD_REQUEST)?
-                    .split(';')
-                    .flat_map(|section| section.split_once('='))
-                    .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
-                    .ok_or(StatusCode::BAD_REQUEST)?;
+                let session = extract_session(&headers)?;
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
                 let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
@@ -145,4 +129,16 @@ impl App {
             _ => Err(StatusCode::NOT_IMPLEMENTED),
         }
     }
+}
+
+fn extract_session(headers: &HeaderMap) -> Result<&str, StatusCode> {
+    headers
+        .get("Cookie")
+        .ok_or(StatusCode::UNAUTHORIZED)?
+        .to_str()
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+        .split(';')
+        .filter_map(|section| section.split_once('='))
+        .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
+        .ok_or(StatusCode::BAD_REQUEST)
 }
