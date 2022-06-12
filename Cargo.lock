@@ -941,13 +941,9 @@ name = "quizzo"
 version = "0.5.0"
 dependencies = [
  "anyhow",
- "futures-util",
  "hex",
  "hyper",
- "mongodb",
  "quizzo-api",
- "quizzo-lobby",
- "ring",
  "tokio",
 ]
 
@@ -975,23 +971,6 @@ dependencies = [
  "hex",
  "mongodb",
  "quizzo-model",
-]
-
-[[package]]
-name = "quizzo-lobby"
-version = "0.4.4"
-dependencies = [
- "anyhow",
- "dashmap",
- "hex",
- "hyper",
- "hyper-trust-dns 0.4.2",
- "quizzo-model",
- "ring",
- "serde_json",
- "tokio",
- "twilight-http",
- "twilight-model",
 ]
 
 [[package]]

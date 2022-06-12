@@ -1,23 +1,4 @@
-use futures_util::{FutureExt, TryFutureExt};
-use hyper::{
-    header::{HeaderValue, CONTENT_TYPE},
-    Body, Response, Server, StatusCode,
-};
-use lobby::{service, Lobby, APPLICATION_JSON};
-use ring::signature::{UnparsedPublicKey, ED25519};
-use std::{
-    convert::Infallible,
-    env, future,
-    net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
-use tokio::runtime::Runtime;
-
-fn resolve_json_bytes(bytes: Vec<u8>) -> Response<Body> {
-    let mut response = Response::new(Body::from(bytes));
-    response.headers_mut().append(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
-    response
-}
+use hyper::{Body, Response, StatusCode};
 
 fn resolve_error_code(code: StatusCode) -> Response<Body> {
     let mut response = Response::new(Body::empty());
@@ -26,33 +7,48 @@ fn resolve_error_code(code: StatusCode) -> Response<Body> {
 }
 
 fn main() -> anyhow::Result<()> {
+    use std::{
+        env,
+        net::{Ipv4Addr, SocketAddr},
+    };
+    use tokio::runtime::Runtime;
+
     // Retrieve the public key
     let key = env::var("PUB_KEY")?;
-    let bytes: Arc<_> = hex::decode(key)?.into();
-    let public = UnparsedPublicKey::new(&ED25519, bytes);
+    let pub_key: Box<_> = hex::decode(key)?.into();
 
     // Parse other environment variables
     let port = env::var("PORT")?.parse()?;
-    let app = env::var("APP_ID")?.parse()?;
+    let app_id = env::var("APP_ID")?.parse()?;
+    let client_id = env::var("CLIENT_ID")?;
+    let client_secret = env::var("CLIENT_SECRET")?;
+    let redirect_uri = env::var("REDIRECT_URI")?;
     let token = env::var("TOKEN")?;
+    let mongo = env::var("MONGODB_URI")?;
 
     // Run server
-    let lobby = Lobby::new(token, app);
     let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
     Runtime::new()?.block_on(async move {
+        use api::{App, MongoClient};
+        use hyper::Server;
+        use std::{convert::Infallible, future, sync::Arc};
+
+        let client = MongoClient::with_uri_str(mongo).await?;
+        let db = client.database("quizzo");
+        let app = Arc::new(App::new(&db, token, app_id, pub_key, &client_id, &client_secret, &redirect_uri));
+        drop(client);
+
         use hyper::service::{make_service_fn, service_fn};
         let service = make_service_fn(move |_| {
-            let lobby_outer = lobby.clone();
-            let public_outer = public.clone();
+            let app_outer = app.clone();
             future::ready(Ok::<_, Infallible>(service_fn(move |req| {
-                let lobby_inner = lobby_outer.clone();
-                let public_inner = public_outer.clone();
-                service::try_respond(req, lobby_inner, public_inner)
-                    .map_ok_or_else(resolve_error_code, resolve_json_bytes)
-                    .map(Ok::<_, Infallible>)
+                let app_inner = app_outer.clone();
+                async move { Ok::<_, Infallible>(app_inner.try_respond(req).await.unwrap_or_else(resolve_error_code)) }
             })))
         });
-        Server::bind(&addr).http1_only(true).serve(service).await
+
+        Server::bind(&addr).http1_only(true).serve(service).await?;
+        anyhow::Ok(())
     })?;
     Ok(())
 }

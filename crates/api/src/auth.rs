@@ -7,7 +7,7 @@ use hyper::{
 pub struct Redirect(Box<str>);
 
 impl Redirect {
-    pub fn new(id: &str, redirect: &Uri) -> Self {
+    pub fn new(id: &str, redirect: &str) -> Self {
         let form = alloc::format!(
             "https://discord.com/api/oauth2/authorize?response_type=code&scope=identify&client_id={id}&redirect_uri={redirect}&state="
         );
@@ -43,7 +43,7 @@ fn parse_code_and_state(query: &str) -> Option<(&str, &str)> {
 pub struct CodeExchanger(Box<str>);
 
 impl CodeExchanger {
-    pub fn new(id: &str, secret: &str, redirect_uri: &Uri) -> Self {
+    pub fn new(id: &str, secret: &str, redirect_uri: &str) -> Self {
         let form = alloc::format!(
             "grant_type=authorization_code&client_id={id}&client_secret={secret}&redirect_uri={redirect_uri}&code="
         );
