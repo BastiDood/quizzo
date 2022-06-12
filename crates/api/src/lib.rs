@@ -47,19 +47,15 @@ impl App {
             (Method::POST, "/discord") => todo!(),
             (Method::POST, "/quiz") => {
                 // Retrieve the session from the cookie
-                let (key, session) = headers
+                let session = headers
                     .get("Cookie")
                     .ok_or(StatusCode::UNAUTHORIZED)?
                     .to_str()
                     .map_err(|_| StatusCode::BAD_REQUEST)?
                     .split(';')
-                    .next()
-                    .ok_or(StatusCode::BAD_REQUEST)?
-                    .split_once('=')
+                    .flat_map(|section| section.split_once('='))
+                    .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
                     .ok_or(StatusCode::BAD_REQUEST)?;
-                if key != "sid" {
-                    return Err(StatusCode::BAD_REQUEST);
-                }
 
                 // Check database if user ID is present
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -104,20 +100,16 @@ impl App {
             }
             (Method::GET, "/auth/callback") => {
                 // Retrieve the session from the cookie
-                let (key, session) = headers
+                let session = headers
                     .get("Cookie")
                     .ok_or(StatusCode::UNAUTHORIZED)?
                     .to_str()
                     .map_err(|_| StatusCode::BAD_REQUEST)?
                     .split(';')
-                    .next()
-                    .ok_or(StatusCode::BAD_REQUEST)?
-                    .split_once('=')
+                    .flat_map(|section| section.split_once('='))
+                    .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
                     .ok_or(StatusCode::BAD_REQUEST)?;
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
-                if key != "sid" {
-                    return Err(StatusCode::BAD_REQUEST);
-                }
 
                 let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
                 let (req, state) = self.exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
