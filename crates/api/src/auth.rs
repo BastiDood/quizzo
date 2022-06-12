@@ -18,7 +18,7 @@ impl Redirect {
         let uri = self.0.clone().into_string() + state;
         let mut res = Response::new(Body::empty());
         *res.status_mut() = StatusCode::FOUND;
-        res.headers_mut().insert("Location", HeaderValue::from_str(&uri)?);
+        assert!(res.headers_mut().insert("Location", HeaderValue::from_str(&uri)?).is_none());
         Ok(res)
     }
 }

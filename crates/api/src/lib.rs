@@ -103,6 +103,22 @@ impl App {
                 self.redirector.try_respond(hash_str).map_err(|_| StatusCode::BAD_REQUEST)
             }
             (Method::GET, "/auth/callback") => {
+                // Retrieve the session from the cookie
+                let (key, session) = headers
+                    .get("Cookie")
+                    .ok_or(StatusCode::UNAUTHORIZED)?
+                    .to_str()
+                    .map_err(|_| StatusCode::BAD_REQUEST)?
+                    .split(';')
+                    .next()
+                    .ok_or(StatusCode::BAD_REQUEST)?
+                    .split_once('=')
+                    .ok_or(StatusCode::BAD_REQUEST)?;
+                let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
+                if key != "sid" {
+                    return Err(StatusCode::BAD_REQUEST);
+                }
+
                 let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
                 let (req, state) = self.exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
                 let body = self.http.request(req).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.into_body();
@@ -124,7 +140,13 @@ impl App {
                     .model()
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                todo!()
+                self.db.upgrade_session(oid, id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+                use hyper::header::HeaderValue;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::FOUND;
+                assert!(res.headers_mut().insert("Location", HeaderValue::from_static("/")).is_none());
+                Ok(res)
             }
             (Method::GET, _) => Err(StatusCode::NOT_FOUND),
             (_, "/discord" | "/quiz" | "/auth/login" | "/auth/callback") => Err(StatusCode::METHOD_NOT_ALLOWED),
