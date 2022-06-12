@@ -1,5 +1,4 @@
 #![no_std]
-
 extern crate alloc;
 
 mod auth;
@@ -117,7 +116,13 @@ impl App {
                     .model()
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                self.db.upgrade_session(oid, id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let old = self
+                    .db
+                    .upgrade_session(oid, id)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::UNAUTHORIZED)?;
+                assert!(old.is_none());
 
                 use hyper::header::HeaderValue;
                 let mut res = Response::new(Body::empty());

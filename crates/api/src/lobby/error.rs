@@ -1,9 +1,9 @@
-use hyper::http::{header::ToStrError, uri::InvalidUri};
-use serde_json::error::Category;
 use core::{
     fmt::{self, Display},
     num::ParseIntError,
 };
+use hyper::http::{header::ToStrError, uri::InvalidUri};
+use serde_json::error::Category;
 
 pub enum Error {
     UnsupportedInteraction,
@@ -13,8 +13,6 @@ pub enum Error {
     InvalidParams,
     UnknownParamName,
     InvalidUri,
-    /// HTTP fetch error.
-    FailedFetch,
     /// JSON syntax error detected.
     Syntax,
     /// Unexpected data types encountered.
@@ -29,12 +27,6 @@ pub enum Error {
 impl From<ParseIntError> for Error {
     fn from(_: ParseIntError) -> Self {
         Self::Data
-    }
-}
-
-impl From<hyper::Error> for Error {
-    fn from(_: hyper::Error) -> Self {
-        Self::FailedFetch
     }
 }
 
@@ -55,7 +47,7 @@ impl From<serde_json::Error> for Error {
         match err.classify() {
             Category::Data => Self::Data,
             Category::Syntax => Self::Syntax,
-            _ => Self::FailedFetch,
+            _ => Self::Unrecoverable,
         }
     }
 }
@@ -71,7 +63,6 @@ impl Display for Error {
             InvalidParams => "Invalid parameter list.",
             UnknownParamName => "Unknown parameter name.",
             InvalidUri => "Invalid URI.",
-            FailedFetch => "Failed to fetch the JSON data.",
             Syntax => "Syntax error in JSON detected.",
             Data => "Unexpected data types detected.",
             TooLarge => "JSON payload is too large. Try sending something less than a kilobyte?",

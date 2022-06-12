@@ -21,6 +21,7 @@ pub struct Submission {
     /// Discord User ID that created this quiz.
     #[serde(rename = "_id")]
     pub id: NonZeroU64,
+    #[serde(flatten)]
     /// The actual quiz information.
     pub quiz: Quiz,
 }

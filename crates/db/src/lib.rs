@@ -3,6 +3,7 @@
 pub mod error;
 
 use core::num::NonZeroU64;
+use model::quiz::Quiz;
 use model::quiz::Submission;
 use mongodb::{bson::doc, results::InsertOneResult, Collection};
 
@@ -27,10 +28,9 @@ impl Database {
         inserted_id.as_object_id().ok_or(error::Error::Fatal)
     }
 
-    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> error::Result<()> {
+    pub async fn upgrade_session(&self, session: ObjectId, user: impl Into<NonZeroU64>) -> error::Result<Option<Session>> {
         let old = self.sessions.find_one_and_replace(doc! { "_id": session }, Some(user.into()), None).await?;
-        assert!(old.is_none());
-        Ok(())
+        Ok(old)
     }
 
     pub async fn get_session(&self, session: ObjectId) -> error::Result<Option<Session>> {
@@ -41,5 +41,10 @@ impl Database {
     pub async fn create_quiz(&self, quiz: &Submission) -> error::Result<ObjectId> {
         let InsertOneResult { inserted_id, .. } = self.quizzes.insert_one(quiz, None).await?;
         inserted_id.as_object_id().ok_or(error::Error::Fatal)
+    }
+
+    pub async fn get_quiz(&self, user: impl Into<NonZeroU64>) -> error::Result<Option<Quiz>> {
+        let id: NonZeroU64 = user.into();
+        Ok(self.quizzes.find_one(doc! { "_id": id.get() as i64 }, None).await?.map(|sub| sub.quiz))
     }
 }

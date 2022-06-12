@@ -2,6 +2,7 @@ mod error;
 
 use alloc::{string::String, vec::Vec};
 use dashmap::DashMap;
+use db::Database;
 use tokio::sync::mpsc;
 use twilight_model::{
     application::interaction::{ApplicationCommand, Interaction, MessageComponentInteraction},
@@ -32,10 +33,10 @@ impl Lobby {
         Self { quizzes: Default::default(), api, app }
     }
 
-    pub fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
+    pub async fn on_interaction(&self, db: &Database, interaction: Interaction) -> InteractionResponse {
         let result = match interaction {
             Interaction::Ping(_) => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
-            Interaction::ApplicationCommand(comm) => self.on_app_comm(*comm),
+            Interaction::ApplicationCommand(comm) => self.on_app_comm(db, *comm).await,
             Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg),
             _ => Err(error::Error::UnsupportedInteraction),
         };
@@ -63,16 +64,26 @@ impl Lobby {
         }
     }
 
-    /// Responds to new application commands.
-    fn on_app_comm(&self, comm: ApplicationCommand) -> error::Result<InteractionResponse> {
+    async fn on_app_comm(&self, db: &Database, comm: ApplicationCommand) -> error::Result<InteractionResponse> {
         match comm.data.name.as_str() {
-            "start" => self.on_start_command(),
+            "start" => {
+                use twilight_model::user::User;
+                let User { id, .. } = comm.user.ok_or(error::Error::UnknownUser)?;
+                self.on_start_command(db, id, comm.id).await
+            }
             "help" => Ok(Self::on_help_command()),
             _ => Err(error::Error::UnknownCommandName),
         }
     }
 
-    fn on_start_command(&self) -> error::Result<InteractionResponse> {
+    async fn on_start_command(
+        &self,
+        db: &Database,
+        user: Id<UserMarker>,
+        interaction: Id<InteractionMarker>,
+    ) -> error::Result<InteractionResponse> {
+        let quiz =
+            db.get_quiz(user).await.map_err(|_| error::Error::UnknownUser)?.ok_or(error::Error::UnknownQuiz)?;
         todo!()
     }
 
