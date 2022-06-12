@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use hyper::{
-    header::{HeaderValue, InvalidHeaderValue, CONTENT_TYPE},
-    Body, Method, Request, Response, StatusCode, Uri,
+    header::{HeaderValue, CONTENT_TYPE},
+    Body, Method, Request, Uri,
 };
 
 pub struct Redirect(Box<str>);
@@ -14,12 +14,9 @@ impl Redirect {
         Self(form.into_boxed_str())
     }
 
-    pub fn try_respond(&self, state: &str) -> Result<Response<Body>, InvalidHeaderValue> {
+    pub fn generate_consent_page_uri(&self, state: &str) -> Box<str> {
         let uri = self.0.clone().into_string() + state;
-        let mut res = Response::new(Body::empty());
-        *res.status_mut() = StatusCode::FOUND;
-        assert!(res.headers_mut().insert("Location", HeaderValue::from_str(&uri)?).is_none());
-        Ok(res)
+        uri.into_boxed_str()
     }
 }
 

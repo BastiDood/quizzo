@@ -6,7 +6,6 @@ pub enum Error {
     UnknownQuiz,
     UnknownUser,
     UnknownCommandName,
-    UnknownParamName,
     Unrecoverable,
 }
 
@@ -19,7 +18,6 @@ impl Display for Error {
             UnknownUser => "Unknown user.",
             UnknownCommandName => "Unknown command name.",
             InvalidParams => "Invalid parameter list.",
-            UnknownParamName => "Unknown parameter name.",
             Unrecoverable => "Oops! We have encountered an unrecoverable error on our end.",
         })
     }
