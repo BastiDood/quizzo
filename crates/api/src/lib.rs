@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod auth;
+mod lobby;
 mod quiz;
 
 use alloc::{string::String, vec::Vec};
