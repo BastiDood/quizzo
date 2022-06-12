@@ -5,14 +5,14 @@ extern crate alloc;
 mod auth;
 mod quiz;
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use auth::{CodeExchanger, Redirect};
 use db::Database;
 use hyper::{Body, Request, Response, StatusCode};
 
 pub use db::{MongoClient, MongoDb, ObjectId};
 pub use hyper::Uri;
-use model::oauth::TokenResponse;
+use model::{oauth::TokenResponse, quiz::Submission};
 
 pub struct App {
     /// Handle to the database collections.
@@ -75,10 +75,14 @@ impl App {
                 use body::Buf;
                 use model::quiz::Quiz;
                 let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
-                let submission: Quiz =
-                    serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let quiz: Quiz = serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-                todo!()
+                // Submit the quiz to the database
+                let submission = Submission { id: user, quiz };
+                let oid: Vec<_> = quiz::try_submit_quiz(&self.db, &submission).await?.into();
+                let mut res = Response::new(oid.into());
+                *res.status_mut() = StatusCode::CREATED;
+                Ok(res)
             }
             (Method::GET, "/auth/login") => {
                 // TODO: Verify whether a session already exists.
