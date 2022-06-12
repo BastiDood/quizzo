@@ -32,11 +32,11 @@ impl Lobby {
         Self { quizzes: Default::default(), api, app }
     }
 
-    pub async fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
+    pub fn on_interaction(&self, interaction: Interaction) -> InteractionResponse {
         let result = match interaction {
             Interaction::Ping(_) => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
-            Interaction::ApplicationCommand(comm) => self.on_app_comm(*comm).await,
-            Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg).await,
+            Interaction::ApplicationCommand(comm) => self.on_app_comm(*comm),
+            Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg),
             _ => Err(error::Error::UnsupportedInteraction),
         };
 
@@ -64,7 +64,7 @@ impl Lobby {
     }
 
     /// Responds to new application commands.
-    async fn on_app_comm(&self, comm: ApplicationCommand) -> error::Result<InteractionResponse> {
+    fn on_app_comm(&self, comm: ApplicationCommand) -> error::Result<InteractionResponse> {
         match comm.data.name.as_str() {
             "start" => self.on_start_command(),
             "help" => Ok(Self::on_help_command()),
@@ -123,7 +123,7 @@ impl Lobby {
     }
 
     /// Responds to message component interactions.
-    async fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> error::Result<InteractionResponse> {
+    fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> error::Result<InteractionResponse> {
         use twilight_model::{application::component::ComponentType::SelectMenu, user::User};
         if !matches!(msg.data.component_type, SelectMenu) {
             return Err(error::Error::UnsupportedInteraction);
