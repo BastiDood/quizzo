@@ -4,11 +4,12 @@ extern crate alloc;
 mod auth;
 mod lobby;
 mod quiz;
+mod util;
 
 use alloc::{string::String, vec::Vec};
 use auth::{CodeExchanger, Redirect};
 use db::Database;
-use hyper::{Body, HeaderMap, Request, Response, StatusCode};
+use hyper::{Body, Request, Response, StatusCode};
 use lobby::Lobby;
 use parking_lot::Mutex;
 use rand_core::{CryptoRng, RngCore};
@@ -101,22 +102,18 @@ where
             }
             (Method::POST, "/quiz") => {
                 // Retrieve the session from the cookie
-                let session = extract_session(&headers)?;
+                let session = util::session::extract_session(&headers)?;
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
                 // Check database if user ID is present
-                use model::session::Session;
-                let session = self
+                let user = self
                     .db
                     .get_session(oid)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::UNAUTHORIZED)?;
-                let user = if let Session::Valid { user, .. } = session {
-                    user
-                } else {
-                    return Err(StatusCode::FORBIDDEN);
-                };
+                    .ok_or(StatusCode::UNAUTHORIZED)?
+                    .as_user()
+                    .ok_or(StatusCode::FORBIDDEN)?;
 
                 // Finally parse the JSON form submission
                 use body::Buf;
@@ -182,7 +179,7 @@ where
                 Ok(res)
             }
             (Method::GET, "/auth/callback") => {
-                let session = extract_session(&headers)?;
+                let session = util::session::extract_session(&headers)?;
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 // Check database if user ID is present
@@ -264,16 +261,4 @@ where
             _ => Err(StatusCode::NOT_IMPLEMENTED),
         }
     }
-}
-
-fn extract_session(headers: &HeaderMap) -> Result<&str, StatusCode> {
-    headers
-        .get("Cookie")
-        .ok_or(StatusCode::UNAUTHORIZED)?
-        .to_str()
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .split(';')
-        .filter_map(|section| section.split_once('='))
-        .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
-        .ok_or(StatusCode::BAD_REQUEST)
 }

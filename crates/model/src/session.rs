@@ -36,3 +36,13 @@ pub enum Session {
         expires: DateTime,
     },
 }
+
+impl Session {
+    pub fn as_user(&self) -> Option<NonZeroU64> {
+        if let Self::Valid { user, .. } = *self {
+            Some(user)
+        } else {
+            None
+        }
+    }
+}
