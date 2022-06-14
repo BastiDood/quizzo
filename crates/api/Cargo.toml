@@ -7,6 +7,8 @@ edition = "2021"
 dashmap = { version = "5.3", default-features = false }
 db = { path = "../db", package = "quizzo-db" }
 model = { path = "../model", package = "quizzo-model" }
+parking_lot = "0.12"
+rand_core = { version = "0.6", default-features = false }
 ring = { version = "0.16", default-features = false }
 serde_json = "1"
 twilight-model = "0.11"

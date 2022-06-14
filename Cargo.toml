@@ -14,6 +14,7 @@ edition = "2021"
 anyhow = "1"
 api = { path = "crates/api", package = "quizzo-api" }
 hex = { version = "0.4", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
 
 [dependencies.hyper]
 version = "0.14"

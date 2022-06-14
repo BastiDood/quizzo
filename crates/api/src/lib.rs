@@ -10,6 +10,8 @@ use auth::{CodeExchanger, Redirect};
 use db::Database;
 use hyper::{Body, HeaderMap, Request, Response, StatusCode};
 use lobby::Lobby;
+use parking_lot::Mutex;
+use rand_core::{RngCore, CryptoRng};
 use ring::signature::UnparsedPublicKey;
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
@@ -17,10 +19,11 @@ pub use db::{MongoClient, MongoDb, ObjectId};
 pub use hyper::Uri;
 pub type ApplicationId = Id<ApplicationMarker>;
 
-pub struct App<B>
+pub struct App<Rng, Bytes>
 where
-    B: AsRef<[u8]>,
+    Bytes: AsRef<[u8]>,
 {
+    rng: Mutex<Rng>,
     /// Handle to the database collections.
     db: Database,
     /// Controls for the lobby.
@@ -31,18 +34,21 @@ where
     exchanger: CodeExchanger,
     /// HTTPS/1.0 client for token-related API calls.
     http: hyper::Client<hyper_trust_dns::RustlsHttpsConnector>,
-    public: UnparsedPublicKey<B>,
+    public: UnparsedPublicKey<Bytes>,
 }
 
-impl<B> App<B>
+impl<Rng, Bytes> App<Rng, Bytes>
 where
-    B: AsRef<[u8]>,
+    Rng: RngCore + CryptoRng,
+    Bytes: AsRef<[u8]>,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        rand: Rng,
         db: &MongoDb,
         bot_token: String,
         app_id: ApplicationId,
-        pub_key: B,
+        pub_key: Bytes,
         client_id: &str,
         client_secret: &str,
         redirect_uri: &str,
@@ -52,6 +58,7 @@ where
         let http = hyper::Client::builder().http1_max_buf_size(8192).set_host(false).build(connector);
         Self {
             http,
+            rng: Mutex::new(rand),
             db: Database::new(db),
             lobby: Lobby::new(bot_token, app_id),
             exchanger: CodeExchanger::new(client_id, client_secret, redirect_uri),
@@ -124,9 +131,8 @@ where
             (Method::GET, "/auth/login") => {
                 // TODO: Verify whether a session already exists.
 
-                // TODO: generate nonce
-
-                let oid = match self.db.create_session(0).await {
+                let nonce = self.rng.lock().next_u64();
+                let oid = match self.db.create_session(nonce).await {
                     Ok(oid) => oid.bytes(),
                     Err(db::error::Error::AlreadyExists) => return Err(StatusCode::FORBIDDEN),
                     _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),

@@ -27,6 +27,8 @@ fn main() -> anyhow::Result<()> {
     let mongo = env::var("MONGODB_URI")?;
 
     // Run server
+    use rand_chacha::rand_core::SeedableRng;
+    let rng = rand_chacha::ChaChaRng::from_entropy();
     let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
     Runtime::new()?.block_on(async move {
         use api::{App, MongoClient};
@@ -35,7 +37,7 @@ fn main() -> anyhow::Result<()> {
 
         let client = MongoClient::with_uri_str(mongo).await?;
         let db = client.database("quizzo");
-        let app = Arc::new(App::new(&db, token, app_id, pub_key, &client_id, &client_secret, &redirect_uri));
+        let app = Arc::new(App::new(rng, &db, token, app_id, pub_key, &client_id, &client_secret, &redirect_uri));
         drop(client);
 
         use hyper::service::{make_service_fn, service_fn};
