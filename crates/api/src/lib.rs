@@ -10,7 +10,6 @@ use auth::{CodeExchanger, Redirect};
 use db::Database;
 use hyper::{Body, HeaderMap, Request, Response, StatusCode};
 use lobby::Lobby;
-use model::{oauth::TokenResponse, quiz::Submission};
 use ring::signature::UnparsedPublicKey;
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
@@ -104,7 +103,8 @@ where
                     .get_session(oid)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::UNAUTHORIZED)?
+                    .user()
                     .ok_or(StatusCode::FORBIDDEN)?;
 
                 // Finally parse the JSON form submission
@@ -114,6 +114,7 @@ where
                 let quiz: Quiz = serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 // Submit the quiz to the database
+                use model::quiz::Submission;
                 let submission = Submission { id: user, quiz };
                 let oid: Vec<_> = quiz::try_submit_quiz(&self.db, &submission).await?.into();
                 let mut res = Response::new(oid.into());
@@ -123,7 +124,9 @@ where
             (Method::GET, "/auth/login") => {
                 // TODO: Verify whether a session already exists.
 
-                let oid = match self.db.create_session().await {
+                // TODO: generate nonce
+
+                let oid = match self.db.create_session(0).await {
                     Ok(oid) => oid.bytes(),
                     Err(db::error::Error::AlreadyExists) => return Err(StatusCode::FORBIDDEN),
                     _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -175,15 +178,14 @@ where
                 }
 
                 use body::Buf;
+                use model::oauth::TokenResponse;
                 let body = self.http.request(req).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.into_body();
                 let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
                 let TokenResponse { access, refresh, expires } =
                     serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-                // TODO: store OAuth tokens somewhere in the database
-
                 use twilight_model::user::CurrentUser;
-                let client = twilight_http::Client::new(access.into_string());
+                let client = twilight_http::Client::new(access.clone().into_string());
                 let CurrentUser { id, .. } = client
                     .current_user()
                     .exec()
@@ -192,13 +194,18 @@ where
                     .model()
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                let old = self
+
+                use core::time::Duration;
+                let expires = Duration::from_secs(expires.get());
+                let success = self
                     .db
-                    .upgrade_session(oid, id)
+                    .upgrade_session(oid, id.into_nonzero(), access, refresh, expires)
                     .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::UNAUTHORIZED)?;
-                assert!(old.is_none());
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+                if !success {
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
 
                 use hyper::header::HeaderValue;
                 let mut res = Response::new(Body::empty());

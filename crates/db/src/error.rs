@@ -4,6 +4,8 @@ use mongodb::error::{ErrorKind, WriteError, WriteFailure};
 pub enum Error {
     /// The object we are trying to insert already exists.
     AlreadyExists,
+    /// Arithmetic overflow occurred when computing the expiration date.
+    TimeOverflow,
     /// Unrecoverable error.
     Fatal,
 }
