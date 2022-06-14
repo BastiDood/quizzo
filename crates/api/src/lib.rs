@@ -74,22 +74,24 @@ where
         match (method, uri.path()) {
             (Method::POST, "/discord") => {
                 // Retrieve security headers
-                let maybe_sig = headers.get("X-Signature-Ed25519").and_then(|val| val.to_str().ok());
-                let maybe_time = headers.get("X-Signature-Timestamp").and_then(|val| val.to_str().ok());
-                let (sig, timestamp) = maybe_sig.zip(maybe_time).ok_or(StatusCode::BAD_REQUEST)?;
+                let maybe_sig = headers.get("X-Signature-Ed25519");
+                let maybe_time = headers.get("X-Signature-Timestamp");
+                let (sig, timestamp) = maybe_sig.zip(maybe_time).ok_or(StatusCode::UNAUTHORIZED)?;
                 let signature = hex::decode(sig).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-                // Verify security headers
+                // Append body after the timestamp
+                let payload = body::to_bytes(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 let mut message = timestamp.as_bytes().to_vec();
-                let bytes = body::to_bytes(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                message.extend_from_slice(&bytes);
+                message.extend_from_slice(&payload);
+
+                // Validate the challenge
                 self.public.verify(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
                 drop(message);
                 drop(signature);
 
                 // Parse incoming interaction
-                let interaction = serde_json::from_slice(&bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
-                drop(bytes);
+                let interaction = serde_json::from_slice(&payload).map_err(|_| StatusCode::BAD_REQUEST)?;
+                drop(payload);
 
                 // Construct new body
                 let reply = self.lobby.on_interaction(&self.db, interaction).await;
