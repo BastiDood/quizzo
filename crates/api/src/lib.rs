@@ -11,7 +11,7 @@ use db::Database;
 use hyper::{Body, HeaderMap, Request, Response, StatusCode};
 use lobby::Lobby;
 use parking_lot::Mutex;
-use rand_core::{RngCore, CryptoRng};
+use rand_core::{CryptoRng, RngCore};
 use ring::signature::UnparsedPublicKey;
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
@@ -105,14 +105,18 @@ where
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
                 // Check database if user ID is present
-                let user = self
+                use model::session::Session;
+                let session = self
                     .db
                     .get_session(oid)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::UNAUTHORIZED)?
-                    .user()
-                    .ok_or(StatusCode::FORBIDDEN)?;
+                    .ok_or(StatusCode::UNAUTHORIZED)?;
+                let user = if let Session::Valid { user, .. } = session {
+                    user
+                } else {
+                    return Err(StatusCode::FORBIDDEN);
+                };
 
                 // Finally parse the JSON form submission
                 use body::Buf;
@@ -131,21 +135,33 @@ where
             (Method::GET, "/auth/login") => {
                 // TODO: Verify whether a session already exists.
 
+                // Create new session with nonce
                 let nonce = self.rng.lock().next_u64();
-                let oid = match self.db.create_session(nonce).await {
+                let oid_bytes = match self.db.create_session(nonce).await {
                     Ok(oid) => oid.bytes(),
                     Err(db::error::Error::AlreadyExists) => return Err(StatusCode::FORBIDDEN),
                     _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
                 };
 
-                assert_eq!(oid.len(), 12);
+                // Encode session ID to hex (to be used as the cookie)
+                assert_eq!(oid_bytes.len(), 12);
                 let mut orig_buf = [0; 12 * 2];
-                hex::encode_to_slice(&oid, &mut orig_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                hex::encode_to_slice(&oid_bytes, &mut orig_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 let orig_hex = core::str::from_utf8(&orig_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+                let nonce_bytes = nonce.to_be_bytes();
+                assert_eq!(nonce_bytes.len(), 8);
+
+                // Append the nonce after the session ID
+                let mut salted = [0; 20];
+                let (left, right) = salted.split_at_mut(oid_bytes.len());
+                left.copy_from_slice(&oid_bytes);
+                right.copy_from_slice(&nonce_bytes);
+
+                // Hash the salted session ID
                 use ring::digest;
-                let mut hash_buf = [0; 64];
-                let hash = digest::digest(&digest::SHA256, &oid);
+                let mut hash_buf = [0; 32 * 2];
+                let hash = digest::digest(&digest::SHA256, &salted);
                 hex::encode_to_slice(hash, &mut hash_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 let hash_str =
                     core::str::from_utf8(hash_buf.as_slice()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -169,14 +185,38 @@ where
                 let session = extract_session(&headers)?;
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+                // Check database if user ID is present
+                use model::session::Session;
+                let session = self
+                    .db
+                    .get_session(oid)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::UNAUTHORIZED)?;
+                let nonce = if let Session::Pending { nonce } = session {
+                    nonce
+                } else {
+                    return Err(StatusCode::FORBIDDEN);
+                };
+
+                let oid_bytes = oid.bytes();
+                assert_eq!(oid_bytes.len(), 12);
+
+                // Append nonce after the session ID
+                let mut salted = [0; 20];
+                let (left, right) = salted.split_at_mut(oid_bytes.len());
+                left.copy_from_slice(&oid_bytes);
+                right.copy_from_slice(&nonce.to_be_bytes());
+
+                // Hash the salted session ID
+                use ring::digest;
+                let hash = digest::digest(&digest::SHA256, &salted);
+
+                // Parse the `state` parameter as raw bytes
                 let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
                 let (req, state) = self.exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
-
                 let mut state_buf = [0; 32];
                 hex::decode_to_slice(state, &mut state_buf).map_err(|_| StatusCode::BAD_REQUEST)?;
-
-                use ring::digest;
-                let hash = digest::digest(&digest::SHA256, &oid.bytes());
 
                 // Validate whether the hash of the session matches
                 if hash.as_ref() != state_buf.as_ref() {
