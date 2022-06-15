@@ -7,7 +7,7 @@ mod lobby;
 mod quiz;
 mod util;
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use auth::{CodeExchanger, Redirect};
 use db::Database;
 use hyper::{Body, Request, Response, StatusCode};
@@ -75,34 +75,7 @@ where
         let (Parts { uri, method, headers, .. }, body) = req.into_parts();
         match (method, uri.path()) {
             (Method::POST, "/discord") => interaction::try_respond(body, &headers, db, public, lobby).await,
-            (Method::POST, "/quiz") => {
-                // Retrieve the session from the cookie
-                let session = util::session::extract_session(&headers)?;
-                let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
-
-                // Check database if user ID is present
-                let user = db
-                    .get_session(oid)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::UNAUTHORIZED)?
-                    .as_user()
-                    .ok_or(StatusCode::FORBIDDEN)?;
-
-                // Finally parse the JSON form submission
-                use body::Buf;
-                use model::quiz::Quiz;
-                let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
-                let quiz: Quiz = serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-                // Submit the quiz to the database
-                use model::quiz::Submission;
-                let submission = Submission { id: user, quiz };
-                let oid: Vec<_> = quiz::try_submit_quiz(db, &submission).await?.into();
-                let mut res = Response::new(oid.into());
-                *res.status_mut() = StatusCode::CREATED;
-                Ok(res)
-            }
+            (Method::POST, "/quiz") => quiz::try_respond(body, &headers, db).await,
             (Method::GET, "/auth/login") => {
                 // TODO: Verify whether a session already exists.
 
