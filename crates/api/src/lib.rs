@@ -74,7 +74,7 @@ where
         let Self { rng, db, lobby, redirector, exchanger, http, public } = self;
         let (Parts { uri, method, headers, .. }, body) = req.into_parts();
         match (method, uri.path()) {
-            (Method::POST, "/discord") => interaction::try_respond(body, &headers, db, public, lobby).await,
+            (Method::POST, "/discord") => interaction::try_respond(body, &headers, public, db, lobby).await,
             (Method::POST, "/quiz") => quiz::try_respond(body, &headers, db).await,
             (Method::GET, "/auth/login") => {
                 // TODO: Verify whether a session already exists.

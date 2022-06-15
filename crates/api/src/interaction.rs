@@ -6,8 +6,8 @@ use ring::signature::UnparsedPublicKey;
 pub async fn try_respond<Bytes>(
     body: Body,
     headers: &HeaderMap,
-    db: &Database,
     public: &UnparsedPublicKey<Bytes>,
+    db: &Database,
     lobby: &Lobby,
 ) -> Result<Response<Body>, StatusCode>
 where
