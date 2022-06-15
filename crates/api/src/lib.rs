@@ -2,6 +2,7 @@
 extern crate alloc;
 
 mod auth;
+mod interaction;
 mod lobby;
 mod quiz;
 mod util;
@@ -70,46 +71,17 @@ where
 
     pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {
         use hyper::{body, http::request::Parts, Method};
+        let Self { rng, db, lobby, redirector, exchanger, http, public } = self;
         let (Parts { uri, method, headers, .. }, body) = req.into_parts();
         match (method, uri.path()) {
-            (Method::POST, "/discord") => {
-                // Retrieve security headers
-                let maybe_sig = headers.get("X-Signature-Ed25519");
-                let maybe_time = headers.get("X-Signature-Timestamp");
-                let (sig, timestamp) = maybe_sig.zip(maybe_time).ok_or(StatusCode::UNAUTHORIZED)?;
-                let signature = hex::decode(sig).map_err(|_| StatusCode::BAD_REQUEST)?;
-
-                // Append body after the timestamp
-                let payload = body::to_bytes(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                let mut message = timestamp.as_bytes().to_vec();
-                message.extend_from_slice(&payload);
-
-                // Validate the challenge
-                self.public.verify(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
-                drop(message);
-                drop(signature);
-
-                // Parse incoming interaction
-                let interaction = serde_json::from_slice(&payload).map_err(|_| StatusCode::BAD_REQUEST)?;
-                drop(payload);
-
-                // Construct new body
-                let reply = self.lobby.on_interaction(&self.db, interaction).await;
-                let bytes = serde_json::to_vec(&reply).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-                use hyper::header::{HeaderValue, CONTENT_TYPE};
-                let mut res = Response::new(Body::from(bytes));
-                assert!(res.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json")).is_none());
-                Ok(res)
-            }
+            (Method::POST, "/discord") => interaction::try_respond(body, &headers, db, public, lobby).await,
             (Method::POST, "/quiz") => {
                 // Retrieve the session from the cookie
                 let session = util::session::extract_session(&headers)?;
                 let oid = ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
                 // Check database if user ID is present
-                let user = self
-                    .db
+                let user = db
                     .get_session(oid)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -126,7 +98,7 @@ where
                 // Submit the quiz to the database
                 use model::quiz::Submission;
                 let submission = Submission { id: user, quiz };
-                let oid: Vec<_> = quiz::try_submit_quiz(&self.db, &submission).await?.into();
+                let oid: Vec<_> = quiz::try_submit_quiz(db, &submission).await?.into();
                 let mut res = Response::new(oid.into());
                 *res.status_mut() = StatusCode::CREATED;
                 Ok(res)
@@ -135,8 +107,8 @@ where
                 // TODO: Verify whether a session already exists.
 
                 // Create new session with nonce
-                let nonce = self.rng.lock().next_u64();
-                let oid = match self.db.create_session(nonce).await {
+                let nonce = rng.lock().next_u64();
+                let oid = match db.create_session(nonce).await {
                     Ok(oid) => oid,
                     Err(db::error::Error::AlreadyExists) => return Err(StatusCode::FORBIDDEN),
                     _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -157,7 +129,7 @@ where
                     core::str::from_utf8(hash_buf.as_slice()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 use hyper::header::{HeaderValue, LOCATION, SET_COOKIE};
-                let redirect = self.redirector.generate_consent_page_uri(hash_str);
+                let redirect = redirector.generate_consent_page_uri(hash_str);
                 let location = HeaderValue::from_str(&redirect).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 let cookie_str = alloc::format!("sid={orig_hex}; Secure; HttpOnly; SameSite=Lax; Max-Age=900");
@@ -177,8 +149,7 @@ where
 
                 // Check database if user ID is present
                 use model::session::Session;
-                let session = self
-                    .db
+                let session = db
                     .get_session(oid)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -196,7 +167,7 @@ where
 
                 // Parse the `state` parameter as raw bytes
                 let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
-                let (req, state) = self.exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
+                let (req, state) = exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
                 let mut state_buf = [0; 32];
                 hex::decode_to_slice(state, &mut state_buf).map_err(|_| StatusCode::BAD_REQUEST)?;
 
@@ -207,7 +178,7 @@ where
 
                 use body::Buf;
                 use model::oauth::TokenResponse;
-                let body = self.http.request(req).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.into_body();
+                let body = http.request(req).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.into_body();
                 let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
                 let TokenResponse { access, refresh, expires } =
                     serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -225,8 +196,7 @@ where
 
                 use core::time::Duration;
                 let expires = Duration::from_secs(expires.get());
-                let success = self
-                    .db
+                let success = db
                     .upgrade_session(oid, id.into_nonzero(), access, refresh, expires)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
