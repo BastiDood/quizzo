@@ -33,7 +33,7 @@ impl CodeExchanger {
         Self(form.into_boxed_str())
     }
 
-    pub fn generate_token_request<'q>(&self, query: &'q str) -> Option<(Request<Body>, &'q str)> {
+    fn generate_token_request<'q>(&self, query: &'q str) -> Option<(Request<Body>, &'q str)> {
         let (code, state) = parse_code_and_state(query)?;
         let full = self.0.clone().into_string() + code;
 
