@@ -7,8 +7,8 @@ if (!APP_ID || !TOKEN)
     throw new Error('missing environment variables');
 
 const endpoint = GUILD_ID
-    ? `https://discord.com/api/v9/applications/${APP_ID}/guilds/${GUILD_ID}/commands`
-    : `https://discord.com/api/v9/applications/${APP_ID}/commands`;
+    ? `https://discord.com/api/v10/applications/${APP_ID}/guilds/${GUILD_ID}/commands`
+    : `https://discord.com/api/v10/applications/${APP_ID}/commands`;
 
 const response = await fetch(endpoint, {
     method: 'PUT',
@@ -18,8 +18,8 @@ const response = await fetch(endpoint, {
     },
     body: JSON.stringify([
         {
-            name: 'create',
-            description: 'Create a new quiz from JSON data.',
+            name: 'start',
+            description: 'Start your most recently submitted quiz.',
             options: [
                 {
                     type: 3,

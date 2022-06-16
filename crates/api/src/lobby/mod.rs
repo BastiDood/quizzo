@@ -233,10 +233,8 @@ impl Lobby {
                     description: Some(String::from("Available commands for Quizzo.")),
                     fields: Vec::from([
                         EmbedField {
-                            name: String::from("`/create url`"),
-                            value: String::from(
-                                "Start a quiz at the given URL. Only accepts attachment URIs from Discord's CDN.",
-                            ),
+                            name: String::from("`/start`"),
+                            value: String::from("Summon a help menu. Will be sent to you via a temporary message."),
                             inline: false,
                         },
                         EmbedField {
