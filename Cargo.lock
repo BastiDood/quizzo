@@ -938,7 +938,7 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quizzo"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "hex",
@@ -950,7 +950,7 @@ dependencies = [
 
 [[package]]
 name = "quizzo-api"
-version = "0.4.4"
+version = "0.6.0"
 dependencies = [
  "dashmap",
  "hex",
@@ -969,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "quizzo-db"
-version = "0.4.4"
+version = "0.6.0"
 dependencies = [
  "hex",
  "mongodb",
@@ -978,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "quizzo-model"
-version = "0.4.4"
+version = "0.6.0"
 dependencies = [
  "bson",
  "serde",
