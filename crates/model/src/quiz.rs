@@ -1,15 +1,14 @@
+use alloc::boxed::Box;
 use core::num::NonZeroU64;
-
-use alloc::{string::String, vec::Vec};
 use serde::{Deserialize, Serialize};
 
 /// Acceptable schema for new questions.
 #[derive(Deserialize, Serialize)]
 pub struct Quiz {
     /// Question to be displayed in chat.
-    pub question: String,
+    pub question: Box<str>,
     /// Possible answers to select from.
-    pub choices: Vec<String>,
+    pub choices: Box<[Box<str>]>,
     /// Index of the selection with the correct answer.
     pub answer: u8,
     /// How long to wait before expiring the poll (in seconds).

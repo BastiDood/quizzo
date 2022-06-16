@@ -108,7 +108,7 @@ impl Lobby {
         }
 
         let answer = usize::from(answer);
-        let correct = choices.get(answer).ok_or(error::Error::Unrecoverable)?.clone().into_boxed_str();
+        let correct = choices.get(answer).ok_or(error::Error::Unrecoverable)?.clone();
 
         let inner = self.inner.clone();
         let app_id = self.app;
@@ -170,10 +170,11 @@ impl Lobby {
         use alloc::string::ToString;
         use twilight_model::application::component::{select_menu::SelectMenuOption, ActionRow, Component, SelectMenu};
         let options = choices
+            .into_vec()
             .into_iter()
             .enumerate()
             .map(|(i, label)| SelectMenuOption {
-                label,
+                label: label.into_string(),
                 description: None,
                 emoji: None,
                 default: false,
@@ -194,7 +195,7 @@ impl Lobby {
         Ok(InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
-                content: Some(question),
+                content: Some(question.into_string()),
                 components: Some(comps),
                 flags: None,
                 tts: None,
