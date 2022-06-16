@@ -8,7 +8,7 @@ mod quiz;
 mod util;
 
 use alloc::string::String;
-use auth::{CodeExchanger, Redirect};
+use auth::{login::Redirect, callback::CodeExchanger};
 use db::Database;
 use hyper::{Body, Request, Response, StatusCode};
 use lobby::Lobby;
@@ -25,6 +25,7 @@ pub struct App<Rng, Bytes>
 where
     Bytes: AsRef<[u8]>,
 {
+    /// Random number generator for cryptographic nonces.
     rng: Mutex<Rng>,
     /// Handle to the database collections.
     db: Database,
@@ -36,6 +37,7 @@ where
     exchanger: CodeExchanger,
     /// HTTPS/1.0 client for token-related API calls.
     http: hyper::Client<hyper_trust_dns::RustlsHttpsConnector>,
+    /// Public key of the Discord application.
     public: UnparsedPublicKey<Bytes>,
 }
 
@@ -167,8 +169,7 @@ where
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-                use core::time::Duration;
-                let expires = Duration::from_secs(expires.get());
+                let expires = core::time::Duration::from_secs(expires.get());
                 let success = db
                     .upgrade_session(oid, id.into_nonzero(), access, refresh, expires)
                     .await
