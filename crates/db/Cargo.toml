@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 model = { path = "../model", package = "quizzo-model" }
-mongodb = "2.2"
+mongodb = "2.3"
 
 [dependencies.hex]
 version = "0.4"

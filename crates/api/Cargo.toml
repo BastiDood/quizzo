@@ -11,7 +11,7 @@ parking_lot = "0.12"
 rand_core = { version = "0.6", default-features = false }
 ring = { version = "0.16", default-features = false }
 serde_json = "1"
-twilight-model = "0.11"
+twilight-model = "0.12"
 
 [dependencies.hex]
 version = "0.4"
@@ -29,11 +29,11 @@ default-features = false
 features = ["https-only", "rustls-http1", "rustls-native"]
 
 [dependencies.tokio]
-version = "1.19"
+version = "1.20"
 default-features = false
 features = ["macros", "sync", "time"]
 
 [dependencies.twilight-http]
-version = "0.11"
+version = "0.12"
 default-features = false
 features = ["decompression", "rustls-native-roots", "trust-dns"]

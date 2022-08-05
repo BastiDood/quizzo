@@ -4,7 +4,7 @@ version = "0.6.0"
 edition = "2021"
 
 [dependencies]
-bson = "2.3"
+bson = "2.4"
 
 [dependencies.serde]
 version = "1"
