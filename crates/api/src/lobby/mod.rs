@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use db::Database;
 use tokio::{sync::mpsc, time};
 use twilight_model::{
-    application::interaction::{ApplicationCommand, Interaction, MessageComponentInteraction},
+    application::interaction::Interaction,
     channel::message::MessageFlags,
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
@@ -45,10 +45,11 @@ impl Lobby {
     }
 
     pub async fn on_interaction(&self, db: &Database, interaction: Interaction) -> InteractionResponse {
-        let result = match interaction {
-            Interaction::Ping(_) => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
-            Interaction::ApplicationCommand(comm) => self.on_app_comm(db, *comm).await,
-            Interaction::MessageComponent(msg) => self.on_msg_interaction(*msg),
+        use twilight_model::application::interaction::InteractionType::{ApplicationCommand, MessageComponent, Ping};
+        let result = match interaction.kind {
+            Ping => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
+            ApplicationCommand => self.on_app_comm(db, interaction).await,
+            MessageComponent => self.on_msg_interaction(interaction),
             _ => Err(error::Error::UnsupportedInteraction),
         };
 
@@ -75,13 +76,17 @@ impl Lobby {
         }
     }
 
-    async fn on_app_comm(&self, db: &Database, comm: ApplicationCommand) -> error::Result<InteractionResponse> {
-        match comm.data.name.as_str() {
+    async fn on_app_comm(&self, db: &Database, interaction: Interaction) -> error::Result<InteractionResponse> {
+        use twilight_model::application::interaction::{application_command::CommandData, InteractionData};
+        let data = interaction.data.ok_or(error::Error::Unrecoverable)?;
+        let CommandData { name, .. } = match data {
+            InteractionData::ApplicationCommand(comm) => *comm,
+            _ => return Err(error::Error::Unrecoverable),
+        };
+        match name.as_str() {
             "start" => {
-                use twilight_model::user::User;
-                let User { id, .. } = comm.user.ok_or(error::Error::UnknownUser)?;
-                let token = comm.token.into_boxed_str();
-                self.on_start_command(db, id, comm.id, token).await
+                let twilight_model::user::User { id, .. } = interaction.user.ok_or(error::Error::Unrecoverable)?;
+                self.on_start_command(db, id, interaction.id, interaction.token.into_boxed_str()).await
             }
             "help" => Ok(Self::on_help_command()),
             _ => Err(error::Error::UnknownCommandName),
@@ -254,21 +259,31 @@ impl Lobby {
     }
 
     /// Responds to message component interactions.
-    fn on_msg_interaction(&self, mut msg: MessageComponentInteraction) -> error::Result<InteractionResponse> {
+    fn on_msg_interaction(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
+        use twilight_model::application::interaction::{
+            message_component::MessageComponentInteractionData, InteractionData,
+        };
         use twilight_model::{application::component::ComponentType::SelectMenu, user::User};
-        if !matches!(msg.data.component_type, SelectMenu) {
-            return Err(error::Error::UnsupportedInteraction);
-        }
 
-        let User { id, .. } = msg.member.and_then(|m| m.user).or(msg.user).ok_or(error::Error::UnknownUser)?;
+        let data = interaction.data.ok_or(error::Error::Unrecoverable)?;
+        let (mut values, custom_id) = match data {
+            InteractionData::MessageComponent(MessageComponentInteractionData {
+                component_type: SelectMenu,
+                values,
+                custom_id,
+            }) => (values, custom_id),
+            _ => return Err(error::Error::UnsupportedInteraction),
+        };
+
+        let User { id, .. } = interaction.user.ok_or(error::Error::UnknownUser)?;
 
         // Since we know that there can only be one value from this interaction,
         // we simply pop the arguments directly. This allows O(1) deletion.
-        let arg = msg.data.values.pop().ok_or(error::Error::Unrecoverable)?;
+        let arg = values.pop().ok_or(error::Error::Unrecoverable)?;
         let choice = arg.parse().map_err(|_| error::Error::InvalidParams)?;
         drop(arg);
 
-        let quiz_id = msg.data.custom_id.parse().map_err(|_| error::Error::Unrecoverable)?;
+        let quiz_id = custom_id.parse().map_err(|_| error::Error::Unrecoverable)?;
         self.inner
             .quizzes
             .get(&quiz_id)
