@@ -28,3 +28,4 @@ features = ["rt-multi-thread", "parking_lot"]
 
 [profile.release]
 lto = true
+strip = true
