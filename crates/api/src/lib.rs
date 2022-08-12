@@ -80,20 +80,25 @@ where
         use hyper::{http::request::Parts, Method};
         let Self { rng, db, lobby, redirector, exchanger, http, public } = self;
         let (Parts { uri, method, headers, .. }, body) = req.into_parts();
-        match (method, uri.path()) {
-            (Method::POST, "/discord") => interaction::try_respond(body, &headers, public, db, lobby).await,
-            (Method::POST, "/quiz") => quiz::try_respond(body, &headers, db).await,
-            (Method::GET, "/auth/login") => {
-                // TODO: Verify whether a session already exists.
-                let nonce = rng.lock().next_u64();
-                login::try_respond(nonce, db, redirector).await
-            }
-            (Method::GET, "/auth/callback") => {
-                let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
-                callback::try_respond(&headers, query, exchanger, db, http).await
-            }
-            (Method::GET, _) => Err(StatusCode::NOT_FOUND),
-            (_, "/discord" | "/quiz" | "/auth/login" | "/auth/callback") => Err(StatusCode::METHOD_NOT_ALLOWED),
+        match method {
+            Method::GET => match uri.path() {
+                "/auth/login" => {
+                    // TODO: Verify whether a session already exists.
+                    let nonce = rng.lock().next_u64();
+                    login::try_respond(nonce, db, redirector).await
+                }
+                "/auth/callback" => {
+                    let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
+                    callback::try_respond(&headers, query, exchanger, db, http).await
+                }
+                _ => Err(StatusCode::NOT_FOUND),
+            },
+            Method::POST => match uri.path() {
+                "/discord" => interaction::try_respond(body, &headers, public, db, lobby).await,
+                "/quiz" => quiz::try_respond(body, &headers, db).await,
+                _ => Err(StatusCode::NOT_FOUND),
+            },
+            Method::PUT | Method::DELETE => Err(StatusCode::METHOD_NOT_ALLOWED),
             _ => Err(StatusCode::NOT_IMPLEMENTED),
         }
     }
