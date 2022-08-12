@@ -98,7 +98,7 @@ where
                 "/quiz" => quiz::try_respond(body, &headers, db).await,
                 _ => Err(StatusCode::NOT_FOUND),
             },
-            Method::PUT | Method::DELETE => Err(StatusCode::METHOD_NOT_ALLOWED),
+            Method::PUT | Method::DELETE | Method::PATCH => Err(StatusCode::METHOD_NOT_ALLOWED),
             _ => Err(StatusCode::NOT_IMPLEMENTED),
         }
     }
