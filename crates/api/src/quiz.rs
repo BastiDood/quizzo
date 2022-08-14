@@ -16,7 +16,11 @@ async fn try_submit_quiz(db: &Database, sub: &Submission) -> Result<[u8; 12], St
     }
 }
 
-pub async fn try_respond(body: Body, headers: &HeaderMap, db: &Database) -> Result<Response<Body>, StatusCode> {
+pub async fn try_respond(body: Body, headers: &mut HeaderMap, db: &Database) -> Result<Response<Body>, StatusCode> {
+    // Ensure that the request is CORS-enabled
+    use hyper::header::{HeaderValue, ACCESS_CONTROL_ALLOW_CREDENTIALS, ORIGIN};
+    let origin = headers.remove(ORIGIN).ok_or(StatusCode::BAD_REQUEST)?;
+
     // Retrieve the session from the cookie
     let session = super::util::session::extract_session(headers)?;
     let oid = db::ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -32,15 +36,19 @@ pub async fn try_respond(body: Body, headers: &HeaderMap, db: &Database) -> Resu
 
     // Finally parse the JSON form submission
     use body::Buf;
-    use model::quiz::Quiz;
     let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
-    let quiz: Quiz = serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let quiz = serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Submit the quiz to the database
     use alloc::vec::Vec;
     let submission = Submission { id: user, quiz };
     let oid: Vec<_> = try_submit_quiz(db, &submission).await?.into();
+
     let mut res = Response::new(oid.into());
     *res.status_mut() = StatusCode::CREATED;
+
+    let head = res.headers_mut();
+    assert!(!head.append(ORIGIN, origin));
+    assert!(!head.append(ACCESS_CONTROL_ALLOW_CREDENTIALS, HeaderValue::from_static("true")));
     Ok(res)
 }

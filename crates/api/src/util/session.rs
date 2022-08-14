@@ -1,16 +1,20 @@
 use db::ObjectId;
 use hyper::{HeaderMap, StatusCode};
 
-/// Extracts the sessionn ID from a map of headers.
-pub fn extract_session(headers: &HeaderMap) -> Result<&str, StatusCode> {
+/// Extracts the session ID from a map of headers.
+pub fn extract_session(headers: &HeaderMap) -> Result<&[u8], StatusCode> {
     headers
         .get("Cookie")
         .ok_or(StatusCode::UNAUTHORIZED)?
-        .to_str()
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .split(';')
-        .filter_map(|section| section.split_once('='))
-        .find_map(|(key, session)| if key == "sid" { Some(session) } else { None })
+        .as_bytes()
+        .split(|&byte| byte == b';')
+        .filter_map(|section| {
+            let mid = section.iter().copied().position(|byte| byte == b'=')?;
+            let (left, right) = section.split_at(mid);
+            let session = &right[1..];
+            Some((left, session))
+        })
+        .find_map(|(key, session)| (key == b"sid").then_some(session))
         .ok_or(StatusCode::UNAUTHORIZED)
 }
 

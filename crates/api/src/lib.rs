@@ -79,7 +79,7 @@ where
     pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {
         use hyper::{http::request::Parts, Method};
         let Self { rng, db, lobby, redirector, exchanger, http, public } = self;
-        let (Parts { uri, method, headers, .. }, body) = req.into_parts();
+        let (Parts { uri, method, mut headers, .. }, body) = req.into_parts();
         match method {
             Method::GET => match uri.path() {
                 "/auth/login" => {
@@ -95,7 +95,7 @@ where
             },
             Method::POST => match uri.path() {
                 "/discord" => interaction::try_respond(body, &headers, public, db, lobby).await,
-                "/quiz" => quiz::try_respond(body, &headers, db).await,
+                "/quiz" => quiz::try_respond(body, &mut headers, db).await,
                 _ => Err(StatusCode::NOT_FOUND),
             },
             Method::PUT | Method::DELETE | Method::PATCH => Err(StatusCode::METHOD_NOT_ALLOWED),
