@@ -22,7 +22,8 @@ pub async fn try_respond(body: Body, headers: &mut HeaderMap, db: &Database) -> 
     let origin = headers.remove(ORIGIN).ok_or(StatusCode::BAD_REQUEST)?;
 
     // Retrieve the session from the cookie
-    let session = super::util::session::extract_session(headers)?;
+    let session_str_bytes = super::util::session::extract_session(headers)?;
+    let session = core::str::from_utf8(session_str_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
     let oid = db::ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Check database if user ID is present

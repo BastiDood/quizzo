@@ -58,8 +58,8 @@ pub async fn try_respond(
     http: &HttpClient,
 ) -> Result<Response<Body>, StatusCode> {
     use crate::util::session;
-
-    let session = session::extract_session(headers)?;
+    let session_str_bytes = crate::util::session::extract_session(headers)?;
+    let session = core::str::from_utf8(session_str_bytes).map_err(|_| StatusCode::BAD_REQUEST)?;
     let oid = db::ObjectId::parse_str(session).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Check database if user ID is present

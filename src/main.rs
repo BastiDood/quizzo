@@ -7,50 +7,54 @@ fn resolve_error_code(code: StatusCode) -> Response<Body> {
 }
 
 fn main() -> anyhow::Result<()> {
-    use std::{
-        env,
-        net::{Ipv4Addr, SocketAddr},
-    };
-    use tokio::runtime::Runtime;
-
     // Retrieve the public key
-    let key = env::var("PUB_KEY")?;
+    use std::env::var;
+    let key = var("PUB_KEY")?;
     let pub_key: Box<_> = hex::decode(key)?.into();
 
     // Parse other environment variables
-    let port = env::var("PORT")?.parse()?;
-    let app_id = env::var("APP_ID")?.parse()?;
-    let client_id = env::var("CLIENT_ID")?;
-    let client_secret = env::var("CLIENT_SECRET")?;
-    let redirect_uri = env::var("REDIRECT_URI")?;
-    let token = env::var("TOKEN")?;
-    let mongo = env::var("MONGODB_URI")?;
+    let port = var("PORT")?.parse()?;
+    let app_id = var("APP_ID")?.parse()?;
+    let client_id = var("CLIENT_ID")?;
+    let client_secret = var("CLIENT_SECRET")?;
+    let redirect_uri = var("REDIRECT_URI")?;
+    let token = var("TOKEN")?;
+    let mongo = var("MONGODB_URI")?;
 
-    // Run server
-    use rand_chacha::rand_core::SeedableRng;
-    let rng = rand_chacha::ChaChaRng::from_entropy();
-    let addr: SocketAddr = (Ipv4Addr::UNSPECIFIED, port).into();
-    Runtime::new()?.block_on(async move {
-        use api::{App, MongoClient};
-        use hyper::Server;
-        use std::{convert::Infallible, future, sync::Arc};
+    // Set up runtime and TCP listener
+    use std::net::{Ipv4Addr, TcpListener};
+    let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, port))?;
+    let runtime = tokio::runtime::Builder::new_multi_thread().enable_io().enable_time().build()?;
+    let tcp = {
+        let _guard = runtime.enter();
+        tokio::net::TcpListener::from_std(listener)?
+    };
 
-        let client = MongoClient::with_uri_str(mongo).await?;
+    let rng: rand_chacha::ChaChaRng = rand_chacha::rand_core::SeedableRng::from_entropy();
+    runtime.block_on(async {
+        let client = api::MongoClient::with_uri_str(mongo).await.expect("cannot connect to Mongo");
         let db = client.database("quizzo");
-        let app = Arc::new(App::new(rng, &db, token, app_id, pub_key, &client_id, &client_secret, &redirect_uri));
         drop(client);
 
-        use hyper::service::{make_service_fn, service_fn};
-        let service = make_service_fn(move |_| {
-            let app_outer = app.clone();
-            future::ready(Ok::<_, Infallible>(service_fn(move |req| {
-                let app_inner = app_outer.clone();
-                async move { Ok::<_, Infallible>(app_inner.try_respond(req).await.unwrap_or_else(resolve_error_code)) }
-            })))
-        });
+        let app = api::App::new(rng, &db, token, app_id, pub_key, &client_id, &client_secret, &redirect_uri);
+        let state = std::sync::Arc::new(app);
 
-        Server::bind(&addr).http1_only(true).serve(service).await?;
-        anyhow::Ok(())
-    })?;
-    Ok(())
+        let mut http = hyper::server::conn::Http::new();
+        http.http1_only(true);
+
+        loop {
+            if let Ok((stream, _)) = tcp.accept().await {
+                let outer = state.clone();
+                let service = hyper::service::service_fn(move |req| {
+                    let inner = outer.clone();
+                    async move {
+                        let response = inner.try_respond(req).await.unwrap_or_else(resolve_error_code);
+                        Ok::<_, core::convert::Infallible>(response)
+                    }
+                });
+                let future = http.serve_connection(stream, service);
+                runtime.spawn(async { future.await.unwrap() });
+            }
+        }
+    })
 }
