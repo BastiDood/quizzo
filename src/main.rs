@@ -42,19 +42,30 @@ fn main() -> anyhow::Result<()> {
         let mut http = hyper::server::conn::Http::new();
         http.http1_only(true);
 
-        loop {
-            if let Ok((stream, _)) = tcp.accept().await {
-                let outer = state.clone();
-                let service = hyper::service::service_fn(move |req| {
-                    let inner = outer.clone();
-                    async move {
-                        let response = inner.try_respond(req).await.unwrap_or_else(resolve_error_code);
-                        Ok::<_, core::convert::Infallible>(response)
-                    }
-                });
-                let future = http.serve_connection(stream, service);
-                runtime.spawn(async { future.await.unwrap() });
+        let stop = tokio::signal::ctrl_c();
+        tokio::pin!(stop);
+        let signal = loop {
+            tokio::select! {
+                Ok((stream, _)) = tcp.accept() => {
+                    let outer = state.clone();
+                    let service = hyper::service::service_fn(move |req| {
+                        let inner = outer.clone();
+                        async move {
+                            let response = inner.try_respond(req).await.unwrap_or_else(resolve_error_code);
+                            Ok::<_, core::convert::Infallible>(response)
+                        }
+                    });
+                    let future = http.serve_connection(stream, service);
+                    runtime.spawn(async { future.await.unwrap() });
+                    continue;
+                }
+                stop_res = &mut stop => break stop_res,
+                else => continue,
             }
-        }
-    })
+        };
+
+        signal.expect("cannot process termination signal");
+    });
+
+    Ok(())
 }

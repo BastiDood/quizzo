@@ -24,7 +24,7 @@ features = ["http1", "server"]
 [dependencies.tokio]
 version = "1.20"
 default-features = false
-features = ["rt-multi-thread", "parking_lot"]
+features = ["macros", "rt-multi-thread", "parking_lot", "signal"]
 
 [profile.release]
 lto = true
