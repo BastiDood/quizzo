@@ -72,9 +72,7 @@ pub async fn try_respond(
     };
 
     // Hash the salted session ID
-    use ring::digest;
-    let salted = session::salt_session_with_nonce(oid, nonce);
-    let hash = digest::digest(&digest::SHA256, &salted);
+    let hash = session::hash_session_salted_with_nonce(oid, nonce).finalize();
 
     // Parse the `state` parameter as raw bytes
     let (req, state) = exchanger.generate_token_request(query).ok_or(StatusCode::BAD_REQUEST)?;
@@ -82,15 +80,14 @@ pub async fn try_respond(
     hex::decode_to_slice(state, &mut state_buf).map_err(|_| StatusCode::BAD_REQUEST)?;
 
     // Validate whether the hash of the session matches
-    if hash.as_ref() != state_buf.as_ref() {
+    if hash.as_bytes().ne(&state_buf) {
         return Err(StatusCode::BAD_REQUEST);
     }
 
     use hyper::body::{self, Buf};
-    use model::oauth::TokenResponse;
-    let body = http.request(req).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.into_body();
+    let body = http.request(req).await.unwrap().into_body();
     let reader = body::aggregate(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?.reader();
-    let TokenResponse { access, refresh, expires } =
+    let model::oauth::TokenResponse { access, refresh, expires } =
         serde_json::from_reader(reader).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     use twilight_model::user::CurrentUser;
@@ -105,22 +102,18 @@ pub async fn try_respond(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let expires = core::time::Duration::from_secs(expires.get());
-    let success = db
+    if !db
         .upgrade_session(oid, id.into_nonzero(), access, refresh, expires)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    if !success {
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     use hyper::header::{HeaderValue, LOCATION};
     let mut res = Response::new(Body::empty());
     *res.status_mut() = StatusCode::FOUND;
-
-    if res.headers_mut().insert(LOCATION, HeaderValue::from_static("/")).is_some() {
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
+    assert!(!res.headers_mut().append(LOCATION, HeaderValue::from_static("/")));
 
     Ok(res)
 }

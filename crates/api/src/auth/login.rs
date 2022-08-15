@@ -27,33 +27,24 @@ pub async fn try_respond(nonce: u64, db: &Database, redirector: &Redirect) -> Re
 
     // Encode session ID to hex (to be used as the cookie)
     let mut orig_buf = [0; 12 * 2];
-    hex::encode_to_slice(&oid.bytes(), &mut orig_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let orig_hex = core::str::from_utf8(&orig_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    hex::encode_to_slice(oid.bytes(), &mut orig_buf).unwrap();
+    let orig_hex = core::str::from_utf8(&orig_buf).unwrap();
 
     // Hash the salted session ID
-    use ring::digest;
-    let salted = crate::util::session::salt_session_with_nonce(oid, nonce);
-    let mut hash_buf = [0; 32 * 2];
-    let hash = digest::digest(&digest::SHA256, &salted);
-    hex::encode_to_slice(hash, &mut hash_buf).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let hash_str = core::str::from_utf8(hash_buf.as_slice()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hash = crate::util::session::hash_session_salted_with_nonce(oid, nonce).finalize().to_hex();
 
     use hyper::header::{HeaderValue, LOCATION, SET_COOKIE};
     let mut res = Response::new(Body::empty());
     *res.status_mut() = StatusCode::FOUND;
     let headers = res.headers_mut();
 
-    let redirect = redirector.generate_consent_page_uri(hash_str);
-    let location = HeaderValue::from_str(&redirect).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if headers.insert(LOCATION, location).is_some() {
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
+    let redirect = redirector.generate_consent_page_uri(hash.as_str());
+    let location = HeaderValue::from_str(&redirect).unwrap();
+    assert!(!headers.append(LOCATION, location));
 
     let cookie_str = alloc::format!("sid={orig_hex}; Secure; HttpOnly; SameSite=Lax; Max-Age=900");
     let cookie = HeaderValue::from_str(&cookie_str).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if headers.insert(SET_COOKIE, cookie).is_some() {
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
-    }
+    assert!(!headers.append(SET_COOKIE, cookie));
 
     Ok(res)
 }

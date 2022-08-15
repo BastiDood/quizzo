@@ -83,7 +83,6 @@ where
         match method {
             Method::GET => match uri.path() {
                 "/auth/login" => {
-                    // TODO: Verify whether a session already exists.
                     let nonce = rng.lock().next_u64();
                     login::try_respond(nonce, db, redirector).await
                 }
