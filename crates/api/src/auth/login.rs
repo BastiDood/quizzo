@@ -25,6 +25,8 @@ pub async fn try_respond(nonce: u64, db: &Database, redirector: &Redirect) -> Re
         _ => return Err(StatusCode::INTERNAL_SERVER_ERROR),
     };
 
+    log::info!("Created new session: {}", oid);
+
     // Encode session ID to hex (to be used as the cookie)
     let mut orig_buf = [0; 12 * 2];
     hex::encode_to_slice(oid.bytes(), &mut orig_buf).unwrap();
@@ -32,6 +34,7 @@ pub async fn try_respond(nonce: u64, db: &Database, redirector: &Redirect) -> Re
 
     // Hash the salted session ID
     let hash = crate::util::session::hash_session_salted_with_nonce(oid, nonce).finalize().to_hex();
+    log::info!("Derived the hash for salted session: {}", hash);
 
     use hyper::header::{HeaderValue, LOCATION, SET_COOKIE};
     let mut res = Response::new(Body::empty());

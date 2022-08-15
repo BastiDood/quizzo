@@ -38,9 +38,17 @@ pub enum Session {
 }
 
 impl Session {
-    pub fn as_user(&self) -> Option<NonZeroU64> {
+    pub const fn as_user(&self) -> Option<NonZeroU64> {
         if let Self::Valid { user, .. } = *self {
             Some(user)
+        } else {
+            None
+        }
+    }
+
+    pub const fn as_nonce(&self) -> Option<u64> {
+        if let Self::Pending { nonce } = *self {
+            Some(nonce)
         } else {
             None
         }

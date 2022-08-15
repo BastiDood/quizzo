@@ -30,6 +30,7 @@ fn main() -> anyhow::Result<()> {
         tokio::net::TcpListener::from_std(listener)?
     };
 
+    env_logger::init();
     let rng: rand_chacha::ChaChaRng = rand_chacha::rand_core::SeedableRng::from_entropy();
     runtime.block_on(async {
         let client = api::MongoClient::with_uri_str(mongo).await.expect("cannot connect to Mongo");

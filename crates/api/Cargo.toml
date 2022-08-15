@@ -7,6 +7,7 @@ edition = "2021"
 blake3 = { version = "1.3", default-features = false }
 dashmap = { version = "5.3", default-features = false }
 db = { path = "../db", package = "quizzo-db" }
+log = "0.4"
 model = { path = "../model", package = "quizzo-model" }
 parking_lot = "0.12"
 rand_core = { version = "0.6", default-features = false }

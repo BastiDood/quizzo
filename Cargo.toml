@@ -13,6 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 api = { path = "crates/api", package = "quizzo-api" }
+env_logger = { version = "0.9", default-features = false }
 hex = { version = "0.4", default-features = false }
 rand_chacha = { version = "0.3", default-features = false }
 
