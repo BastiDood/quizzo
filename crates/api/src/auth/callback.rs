@@ -26,9 +26,10 @@ fn parse_code_and_state(query: &str) -> Option<(&str, &str)> {
 pub struct CodeExchanger(Box<str>);
 
 impl CodeExchanger {
-    pub fn new(id: &str, secret: &str, redirect_uri: &str) -> Self {
+    pub fn new(id: &str, secret: &str, redirect_uri: &[u8]) -> Self {
+        let uri = percent_encoding::percent_encode(redirect_uri, percent_encoding::NON_ALPHANUMERIC);
         let form = alloc::format!(
-            "grant_type=authorization_code&client_id={id}&client_secret={secret}&redirect_uri={redirect_uri}&code="
+            "grant_type=authorization_code&client_id={id}&client_secret={secret}&redirect_uri={uri}&code="
         );
         Self(form.into_boxed_str())
     }

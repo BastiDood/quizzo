@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
         let db = client.database("quizzo");
         drop(client);
 
-        let app = api::App::new(rng, &db, token, app_id, pub_key, &client_id, &client_secret, &redirect_uri);
+        let app = api::App::new(rng, &db, token, app_id, pub_key, &client_id, &client_secret, redirect_uri.as_bytes());
         let state = std::sync::Arc::new(app);
 
         let mut http = hyper::server::conn::Http::new();

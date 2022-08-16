@@ -5,9 +5,10 @@ use hyper::{Body, Response, StatusCode};
 pub struct Redirect(Box<str>);
 
 impl Redirect {
-    pub fn new(id: &str, redirect: &str) -> Self {
+    pub fn new(id: &str, redirect: &[u8]) -> Self {
+        let uri = percent_encoding::percent_encode(redirect, percent_encoding::NON_ALPHANUMERIC);
         let form = alloc::format!(
-            "https://discord.com/api/oauth2/authorize?response_type=code&scope=identify&client_id={id}&redirect_uri={redirect}&state="
+            "https://discord.com/api/oauth2/authorize?response_type=code&scope=identify&client_id={id}&redirect_uri={uri}&state="
         );
         Self(form.into_boxed_str())
     }

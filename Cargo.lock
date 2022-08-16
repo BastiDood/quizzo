@@ -948,6 +948,7 @@ dependencies = [
  "hyper-trust-dns",
  "log",
  "parking_lot",
+ "percent-encoding",
  "quizzo-db",
  "quizzo-model",
  "rand_core",

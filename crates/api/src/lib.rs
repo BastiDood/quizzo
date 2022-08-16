@@ -60,7 +60,7 @@ where
         pub_key: Bytes,
         client_id: &str,
         client_secret: &str,
-        redirect_uri: &str,
+        redirect_uri: &[u8],
     ) -> Self {
         use ring::signature::ED25519;
         let connector = hyper_trust_dns::TrustDnsResolver::default().into_rustls_native_https_connector();
