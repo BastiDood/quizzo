@@ -21,9 +21,12 @@ fn main() -> anyhow::Result<()> {
     let token = var("TOKEN")?;
     let mongo = var("MONGODB_URI")?;
 
-    // Set up runtime and TCP listener
+    // Set up TCP listener
     use std::net::{Ipv4Addr, TcpListener};
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, port))?;
+    listener.set_nonblocking(true)?;
+
+    // Set up runtime
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_io().enable_time().build()?;
     let tcp = {
         let _guard = runtime.enter();
