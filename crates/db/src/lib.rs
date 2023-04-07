@@ -9,14 +9,20 @@ use tokio_postgres::error::SqlState;
 pub use model::Uuid;
 pub use tokio_postgres::{tls::NoTls, Client, Config};
 
-pub type Result<T> = core::result::Result<T, tokio_postgres::error::Error>;
-
 pub struct Database(Client);
 
 impl From<Client> for Database {
     fn from(client: Client) -> Self {
         Self(client)
     }
+}
+
+fn deserialize_from_row(row: tokio_postgres::Row) -> Result<Quiz, tokio_postgres::Error> {
+    let timeout = row.try_get(3)?;
+    let answer = row.try_get(2)?;
+    let question = row.try_get(0)?;
+    let choices = row.try_get(1)?;
+    Ok(Quiz { question, choices, answer, timeout })
 }
 
 impl Database {
@@ -53,11 +59,17 @@ impl Database {
             .await
             .map_err(|_| error::Error::Fatal)?
             .ok_or(error::Error::NotFound)?;
-        let question = row.try_get(0).map_err(|_| error::Error::Fatal)?;
-        let choices = row.try_get(1).map_err(|_| error::Error::Fatal)?;
-        let answer = row.try_get(2).map_err(|_| error::Error::Fatal)?;
-        let timeout = row.try_get(3).map_err(|_| error::Error::Fatal)?;
-        Ok(Quiz { question, choices, answer, timeout })
+        deserialize_from_row(row).map_err(|_| error::Error::Fatal)
+    }
+
+    pub async fn pop_quiz(&self, id: Uuid) -> error::Result<Quiz> {
+        let row = self
+            .0
+            .query_opt("DELETE FROM quiz WHERE id = $1 RETURNING question, choices, answer, timeout", &[&id])
+            .await
+            .map_err(|_| error::Error::Fatal)?
+            .ok_or(error::Error::NotFound)?;
+        deserialize_from_row(row).map_err(|_| error::Error::Fatal)
     }
 
     pub async fn add_choice(&self, id: Uuid, choice: &str) -> error::Result<()> {
