@@ -3,6 +3,8 @@ pub enum Error {
     NotFound,
     /// Input cannot be accepted due to data constraints.
     BadInput,
+    /// Attempted to insert too many choices.
+    TooMany,
     /// An unexpected and unrecoverable error.
     Fatal,
 }
