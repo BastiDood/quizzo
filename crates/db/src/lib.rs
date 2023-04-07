@@ -2,6 +2,7 @@
 
 pub mod error;
 
+use core::num::NonZeroU32;
 use tokio_postgres::error::SqlState;
 
 pub use model::Uuid;
@@ -66,6 +67,22 @@ impl Database {
             // Unexpected error type.
             _ => error::Error::Fatal,
         })
+    }
+
+    pub async fn remove_choice(&self, id: Uuid, index: NonZeroU32) -> error::Result<()> {
+        let index = index.get();
+        match self
+            .0
+            .execute(
+                "UPDATE quiz SET answer = DEFAULT, choices = choices[1:$2-1] || choices[$2+1:NULL] WHERE id = $1",
+                &[&id, &index],
+            )
+            .await
+        {
+            Ok(1) => Ok(()),
+            Ok(0) => Err(error::Error::NotFound),
+            _ => Err(error::Error::Fatal),
+        }
     }
 
     pub async fn set_answer(&self, id: Uuid, answer: u32) -> error::Result<()> {
