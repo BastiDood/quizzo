@@ -974,7 +974,6 @@ dependencies = [
 name = "quizzo-model"
 version = "0.6.0"
 dependencies = [
- "bson",
  "serde",
 ]
 

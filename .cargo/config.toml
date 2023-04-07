@@ -1,3 +1,0 @@
-[build]
-# Enables SIMD instructions for `blake3` crate.
-rustflags = ["-C", "target-cpu=native"]
