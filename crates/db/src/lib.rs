@@ -3,6 +3,7 @@
 pub mod error;
 
 use core::num::NonZeroU32;
+use model::Quiz;
 use tokio_postgres::error::SqlState;
 
 pub use model::Uuid;
@@ -43,6 +44,20 @@ impl Database {
         }
 
         Err(error::Error::BadInput)
+    }
+
+    pub async fn get_quiz(&self, id: Uuid) -> error::Result<Quiz> {
+        let row = self
+            .0
+            .query_opt("SELECT question, choices, answer, timeout FROM quiz WHERE id = $1", &[&id])
+            .await
+            .map_err(|_| error::Error::Fatal)?
+            .ok_or(error::Error::NotFound)?;
+        let question = row.try_get(0).map_err(|_| error::Error::Fatal)?;
+        let choices = row.try_get(1).map_err(|_| error::Error::Fatal)?;
+        let answer = row.try_get(2).map_err(|_| error::Error::Fatal)?;
+        let timeout = row.try_get(3).map_err(|_| error::Error::Fatal)?;
+        Ok(Quiz { question, choices, answer, timeout })
     }
 
     pub async fn add_choice(&self, id: Uuid, choice: &str) -> error::Result<()> {

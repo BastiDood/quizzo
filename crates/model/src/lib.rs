@@ -8,16 +8,13 @@ pub use uuid::Uuid;
 
 /// Acceptable schema for new questions.
 #[derive(Deserialize, Serialize)]
-pub struct Quiz<'choices> {
-    /// Unique ID for referending a quiz.
-    pub id: Uuid,
+pub struct Quiz {
     /// Question to be displayed in chat.
     pub question: Box<str>,
     /// Possible answers to select from.
-    #[serde(borrow)]
-    pub choices: Box<[&'choices str]>,
+    pub choices: Box<[Box<str>]>,
     /// Index of the selection with the correct answer.
     pub answer: Option<u32>,
     /// How long to wait before expiring the poll (in seconds).
-    pub timeout: u64,
+    pub timeout: u32,
 }
