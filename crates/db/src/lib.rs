@@ -112,6 +112,27 @@ impl Database {
         }
     }
 
+    pub async fn set_question(&self, id: Uuid, question: &str) -> error::Result<()> {
+        let err = match self.0.execute("UPDATE quiz SET question = $2 WHERE id = $1", &[&id, &question]).await {
+            Ok(1) => return Ok(()),
+            Ok(0) => return Err(error::Error::NotFound),
+            Err(err) => err,
+            _ => return Err(error::Error::Fatal),
+        };
+
+        let err = err.as_db_error().ok_or(error::Error::Fatal)?;
+        if *err.code() != SqlState::CHECK_VIOLATION {
+            return Err(error::Error::Fatal);
+        }
+
+        let constraint = err.constraint().ok_or(error::Error::Fatal)?;
+        if constraint != "question_check" {
+            return Err(error::Error::Fatal);
+        }
+
+        Err(error::Error::BadInput)
+    }
+
     pub async fn set_answer(&self, id: Uuid, answer: u32) -> error::Result<()> {
         let err = match self.0.execute("UPDATE quiz SET answer = $2 WHERE id = $1", &[&id, &answer]).await {
             Ok(1) => return Ok(()),
