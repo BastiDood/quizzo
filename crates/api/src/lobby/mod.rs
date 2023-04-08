@@ -1,6 +1,6 @@
 mod error;
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::num::NonZeroI16;
 use db::Database;
 use tokio::sync::mpsc;
@@ -9,9 +9,10 @@ use twilight_model::{
         application_command::{CommandData, CommandDataOption, CommandOptionValue},
         Interaction, InteractionData, InteractionType,
     },
-    channel::message::MessageFlags,
+    channel::message::{embed::EmbedField, Embed, MessageFlags},
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{marker::UserMarker, Id},
+    user::User,
 };
 
 type UserId = Id<UserMarker>;
@@ -67,7 +68,7 @@ impl Bot {
     }
 
     async fn on_app_command(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
-        let user =
+        let User { id, .. } =
             interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
         let data = interaction.data.ok_or(error::Error::Fatal)?;
         let InteractionData::ApplicationCommand(CommandData { name, options, .. }) = data else {
@@ -75,9 +76,10 @@ impl Bot {
         };
 
         match name.as_str() {
-            "create" => self.on_create_command(user.id, &options).await,
-            "edit" => todo!(),
-            "start" => todo!(),
+            "create" => self.on_create_command(id, &options).await,
+            "list" => self.on_list_command(id).await,
+            "edit" => self.on_edit_command(id, &options),
+            "start" => self.on_start_command(id, &options),
             "help" => todo!(),
             _ => Err(error::Error::Fatal),
         }
@@ -107,6 +109,71 @@ impl Bot {
                 ..Default::default()
             }),
         })
+    }
+
+    async fn on_list_command(
+        &self,
+        uid: Id<UserMarker>,
+    ) -> error::Result<InteractionResponse> {
+        use db::TryStreamExt;
+        let fields: Vec<_> = self
+            .db
+            .get_quizzes_by_user(uid)
+            .await
+            .map_err(|_| error::Error::Fatal)?
+            .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, .. } }| EmbedField {
+                inline: false,
+                name: alloc::format!("**[{id}]:** {question}"),
+                value: alloc::format!("{expiration}-second timeout with {} choices.", choices.len()),
+            })
+            .try_collect()
+            .await?;
+        Ok(InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(if fields.is_empty() {
+                InteractionResponseData {
+                    content: Some(String::from("You currently have no quizzes registered.")),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }
+            } else {
+                InteractionResponseData {
+                    embeds: Some(alloc::vec![Embed {
+                        fields,
+                        kind: String::from("rich"),
+                        color: Some(0x236EA5),
+                        author: None,
+                        description: None,
+                        footer: None,
+                        image: None,
+                        provider: None,
+                        thumbnail: None,
+                        timestamp: None,
+                        title: None,
+                        url: None,
+                        video: None,
+                    }]),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }
+            }),
+        })
+    }
+
+    fn on_edit_command(
+        &self,
+        uid: Id<UserMarker>,
+        options: &[CommandDataOption],
+    ) -> error::Result<InteractionResponse> {
+        todo!()
+    }
+
+    fn on_start_command(
+        &self,
+        uid: Id<UserMarker>,
+        options: &[CommandDataOption],
+    ) -> error::Result<InteractionResponse> {
+        todo!()
     }
 
     fn on_msg_component(&self, interaction: Interaction) -> error::Result<InteractionResponse> {

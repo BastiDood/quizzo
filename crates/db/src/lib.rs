@@ -3,11 +3,11 @@ extern crate alloc;
 
 pub mod error;
 
-use alloc::vec::Vec;
 use core::num::{NonZeroI16, NonZeroU64};
-use model::{Quiz, RawQuiz};
 use tokio_postgres::error::SqlState;
 
+pub use futures_util::{TryStream, TryStreamExt};
+pub use model::{Quiz, RawQuiz};
 pub use tokio_postgres::{tls::NoTls, Client, Config};
 
 pub struct Database(Client);
@@ -77,17 +77,18 @@ impl Database {
         deserialize_raw_quiz_from_row(row).map_err(|_| error::Error::Fatal)
     }
 
-    pub async fn get_quizzes_by_user(&self, user: NonZeroU64) -> error::Result<Vec<Quiz>> {
-        use futures_util::TryStreamExt;
+    pub async fn get_quizzes_by_user(
+        &self,
+        user: NonZeroU64,
+    ) -> error::Result<impl TryStream<Ok = Quiz, Error = error::Error> + '_> {
         let uid = user.get() as i64;
-        self.0
+        Ok(self
+            .0
             .query_raw("SELECT id, question, choices, answer, expiration FROM quiz WHERE author = $1", &[&uid])
             .await
             .map_err(|_| error::Error::Fatal)?
             .map_err(|_| error::Error::Fatal)
-            .and_then(|row| core::future::ready(deserialize_quiz_from_row(row)))
-            .try_collect()
-            .await
+            .and_then(|row| core::future::ready(deserialize_quiz_from_row(row))))
     }
 
     pub async fn pop_quiz(&self, user: NonZeroU64, quiz: NonZeroI16) -> error::Result<RawQuiz> {
@@ -182,12 +183,14 @@ impl Database {
     pub async fn set_answer(&self, user: NonZeroU64, quiz: NonZeroI16, answer: u32) -> error::Result<()> {
         let uid = user.get() as i64;
         let qid = quiz.get();
-        let err = match self.0.execute("UPDATE quiz SET answer = $3 WHERE author = $1 id = $2", &[&uid, &qid, &answer]).await {
-            Ok(1) => return Ok(()),
-            Ok(0) => return Err(error::Error::NotFound),
-            Err(err) => err,
-            _ => return Err(error::Error::Fatal),
-        };
+        let err =
+            match self.0.execute("UPDATE quiz SET answer = $3 WHERE author = $1 id = $2", &[&uid, &qid, &answer]).await
+            {
+                Ok(1) => return Ok(()),
+                Ok(0) => return Err(error::Error::NotFound),
+                Err(err) => err,
+                _ => return Err(error::Error::Fatal),
+            };
 
         let err = err.as_db_error().ok_or(error::Error::Fatal)?;
         if *err.code() != SqlState::CHECK_VIOLATION {
