@@ -79,7 +79,7 @@ impl Bot {
             "create" => self.on_create_command(id, &options).await,
             "list" => self.on_list_command(id).await,
             "add" => self.on_add_choice(id, &options).await,
-            "remove" => self.on_remove_choice(id, &options),
+            "remove" => self.on_remove_choice(id, &options).await,
             "edit" => self.on_edit_command(id, &options),
             "start" => self.on_start_command(id, &options),
             "help" => todo!(),
@@ -200,12 +200,42 @@ impl Bot {
         })
     }
 
-    fn on_remove_choice(
+    async fn on_remove_choice(
         &self,
         uid: Id<UserMarker>,
         options: &[CommandDataOption],
     ) -> error::Result<InteractionResponse> {
-        todo!()
+        let [
+            CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
+            CommandDataOption { name: index_arg, value: CommandOptionValue::Integer(index) },
+        ] = options else {
+            return Err(error::Error::InvalidParams);
+        };
+
+        if qid_arg.as_str() != "quiz" || index_arg.as_str() != "index" {
+            return Err(error::Error::UnknownCommandName);
+        }
+
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
+        let index = u16::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
+        self.db.remove_choice(uid.into_nonzero(), qid, index);
+        let Err(err) = self.db.remove_choice(uid.into_nonzero(), qid, index).await else {
+            return Ok(InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    content: Some(alloc::format!("Successfully removed choice `{index}` from quiz **[{qid}]**. The answer has also been reset.")),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }),
+            });
+        };
+
+        use db::error::Error as DbError;
+        Err(match err {
+            DbError::NotFound => error::Error::UnknownQuiz,
+            _ => error::Error::Fatal,
+        })
     }
 
     fn on_edit_command(
