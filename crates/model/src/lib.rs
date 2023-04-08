@@ -2,13 +2,11 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use serde::{Deserialize, Serialize};
+use core::num::NonZeroI16;
+use serde::Deserialize;
 
-pub use uuid::Uuid;
-
-/// Acceptable schema for new questions.
-#[derive(Deserialize, Serialize)]
-pub struct Quiz {
+#[derive(Deserialize)]
+pub struct RawQuiz {
     /// Question to be displayed in chat.
     pub question: Box<str>,
     /// Possible answers to select from.
@@ -16,5 +14,14 @@ pub struct Quiz {
     /// Index of the selection with the correct answer.
     pub answer: Option<u32>,
     /// How long to wait before expiring the poll (in seconds).
-    pub timeout: u32,
+    pub expiration: u32,
+}
+
+#[derive(Deserialize)]
+pub struct Quiz {
+    /// Monotonically increasing quiz ID.
+    pub id: NonZeroI16,
+    /// The raw internal quiz.
+    #[serde(flatten)]
+    pub raw: RawQuiz,
 }

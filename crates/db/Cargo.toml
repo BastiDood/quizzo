@@ -9,3 +9,7 @@ model = { path = "../model", package = "quizzo-model" }
 [dependencies.tokio-postgres]
 version = "0.7"
 features = ["with-uuid-1"]
+
+[dependencies.futures-util]
+version = "0.3"
+default-features = false

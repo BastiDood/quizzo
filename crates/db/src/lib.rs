@@ -1,12 +1,13 @@
 #![no_std]
+extern crate alloc;
 
 pub mod error;
 
-use core::num::NonZeroU32;
-use model::Quiz;
+use alloc::vec::Vec;
+use core::num::{NonZeroI16, NonZeroU64};
+use model::{Quiz, RawQuiz};
 use tokio_postgres::error::SqlState;
 
-pub use model::Uuid;
 pub use tokio_postgres::{tls::NoTls, Client, Config};
 
 pub struct Database(Client);
@@ -17,24 +18,33 @@ impl From<Client> for Database {
     }
 }
 
-fn deserialize_from_row(row: tokio_postgres::Row) -> Result<Quiz, tokio_postgres::Error> {
-    let timeout = row.try_get(3)?;
-    let answer = row.try_get(2)?;
-    let question = row.try_get(0)?;
-    let choices = row.try_get(1)?;
-    Ok(Quiz { question, choices, answer, timeout })
+fn deserialize_raw_quiz_from_row(row: tokio_postgres::Row) -> Result<RawQuiz, tokio_postgres::Error> {
+    let expiration = row.try_get("expiration")?;
+    let answer = row.try_get("answer")?;
+    let question = row.try_get("question")?;
+    let choices = row.try_get("choices")?;
+    Ok(RawQuiz { question, choices, answer, expiration })
+}
+
+fn deserialize_quiz_from_row(row: tokio_postgres::Row) -> error::Result<Quiz> {
+    let id: i16 = row.try_get("id").map_err(|_| error::Error::Fatal)?;
+    let id = NonZeroI16::new(id).ok_or(error::Error::Fatal)?;
+    let raw = deserialize_raw_quiz_from_row(row).map_err(|_| error::Error::Fatal)?;
+    Ok(Quiz { id, raw })
 }
 
 impl Database {
-    pub async fn init_quiz(&self, question: &str, timeout: u32) -> error::Result<Uuid> {
+    pub async fn init_quiz(&self, user: NonZeroU64, question: &str) -> error::Result<NonZeroI16> {
+        let uid = user.get() as i64;
         let err = match self
             .0
-            .query_opt("INSERT INTO quiz (question, timeout) VALUES ($1, $2) RETURNING id", &[&question, &timeout])
+            .query_opt("INSERT INTO quiz (user, question) VALUES ($1, $2) RETURNING id", &[&uid, &question])
             .await
         {
             Ok(row) => {
-                let uuid = row.ok_or(error::Error::Fatal)?.try_get(0).map_err(|_| error::Error::Fatal)?;
-                return Ok(uuid);
+                let row = row.ok_or(error::Error::Fatal)?;
+                let id: i16 = row.try_get("id").map_err(|_| error::Error::Fatal)?;
+                return NonZeroI16::new(id).ok_or(error::Error::Fatal);
             }
             Err(err) => err,
         };
@@ -45,37 +55,65 @@ impl Database {
         }
 
         let constraint = err.constraint().ok_or(error::Error::Fatal)?;
-        if constraint != "quiz_timeout_check" {
-            return Err(error::Error::Fatal);
+        if constraint == "quiz_question_check" {
+            return Err(error::Error::BadInput);
         }
 
-        Err(error::Error::BadInput)
+        Err(error::Error::Fatal)
     }
 
-    pub async fn get_quiz(&self, id: Uuid) -> error::Result<Quiz> {
+    pub async fn get_quiz(&self, user: NonZeroU64, quiz: NonZeroI16) -> error::Result<RawQuiz> {
+        let uid = user.get() as i64;
+        let qid = quiz.get();
         let row = self
             .0
-            .query_opt("SELECT question, choices, answer, timeout FROM quiz WHERE id = $1", &[&id])
+            .query_opt(
+                "SELECT question, choices, answer, expiration FROM quiz WHERE author = $1 AND id = $2",
+                &[&uid, &qid],
+            )
             .await
             .map_err(|_| error::Error::Fatal)?
             .ok_or(error::Error::NotFound)?;
-        deserialize_from_row(row).map_err(|_| error::Error::Fatal)
+        deserialize_raw_quiz_from_row(row).map_err(|_| error::Error::Fatal)
     }
 
-    pub async fn pop_quiz(&self, id: Uuid) -> error::Result<Quiz> {
+    pub async fn get_quizzes_by_user(&self, user: NonZeroU64) -> error::Result<Vec<Quiz>> {
+        use futures_util::TryStreamExt;
+        let uid = user.get() as i64;
+        self.0
+            .query_raw("SELECT id, question, choices, answer, expiration FROM quiz WHERE author = $1", &[&uid])
+            .await
+            .map_err(|_| error::Error::Fatal)?
+            .map_err(|_| error::Error::Fatal)
+            .and_then(|row| core::future::ready(deserialize_quiz_from_row(row)))
+            .try_collect()
+            .await
+    }
+
+    pub async fn pop_quiz(&self, user: NonZeroU64, quiz: NonZeroI16) -> error::Result<RawQuiz> {
+        let uid = user.get() as i64;
+        let qid = quiz.get();
         let row = self
             .0
-            .query_opt("DELETE FROM quiz WHERE id = $1 RETURNING question, choices, answer, timeout", &[&id])
+            .query_opt(
+                "DELETE FROM quiz WHERE author = $1, id = $2 RETURNING question, choices, answer, timeout",
+                &[&uid, &qid],
+            )
             .await
             .map_err(|_| error::Error::Fatal)?
             .ok_or(error::Error::NotFound)?;
-        deserialize_from_row(row).map_err(|_| error::Error::Fatal)
+        deserialize_raw_quiz_from_row(row).map_err(|_| error::Error::Fatal)
     }
 
-    pub async fn add_choice(&self, id: Uuid, choice: &str) -> error::Result<()> {
+    pub async fn add_choice(&self, user: NonZeroU64, quiz: NonZeroI16, choice: &str) -> error::Result<()> {
+        let uid = user.get() as i64;
+        let qid = quiz.get();
         let err = match self
             .0
-            .execute("UPDATE quiz SET choices = array_append(choices, $2) WHERE id = $1", &[&id, &choice])
+            .execute(
+                "UPDATE quiz SET choices = array_append(choices, $3) WHERE author = $1 AND id = $2",
+                &[&uid, &qid, &choice],
+            )
             .await
         {
             Ok(1) => return Ok(()),
@@ -96,13 +134,15 @@ impl Database {
         })
     }
 
-    pub async fn remove_choice(&self, id: Uuid, index: NonZeroU32) -> error::Result<()> {
-        let index = index.get();
+    pub async fn remove_choice(&self, user: NonZeroU64, quiz: NonZeroI16, index: u16) -> error::Result<()> {
+        let uid = user.get() as i64;
+        let qid = quiz.get();
+        let index = i16::try_from(index).map_err(|_| error::Error::BadInput)?;
         match self
             .0
             .execute(
                 "UPDATE quiz SET answer = DEFAULT, choices = choices[1:$2-1] || choices[$2+1:NULL] WHERE id = $1",
-                &[&id, &index],
+                &[&uid, &qid, &index],
             )
             .await
         {
@@ -112,8 +152,14 @@ impl Database {
         }
     }
 
-    pub async fn set_question(&self, id: Uuid, question: &str) -> error::Result<()> {
-        let err = match self.0.execute("UPDATE quiz SET question = $2 WHERE id = $1", &[&id, &question]).await {
+    pub async fn set_question(&self, user: NonZeroU64, quiz: NonZeroI16, question: &str) -> error::Result<()> {
+        let uid = user.get() as i64;
+        let qid = quiz.get();
+        let err = match self
+            .0
+            .execute("UPDATE quiz SET question = $3 WHERE author = $1 AND id = $2", &[&uid, &qid, &question])
+            .await
+        {
             Ok(1) => return Ok(()),
             Ok(0) => return Err(error::Error::NotFound),
             Err(err) => err,
@@ -133,8 +179,10 @@ impl Database {
         Err(error::Error::BadInput)
     }
 
-    pub async fn set_answer(&self, id: Uuid, answer: u32) -> error::Result<()> {
-        let err = match self.0.execute("UPDATE quiz SET answer = $2 WHERE id = $1", &[&id, &answer]).await {
+    pub async fn set_answer(&self, user: NonZeroU64, quiz: NonZeroI16, answer: u32) -> error::Result<()> {
+        let uid = user.get() as i64;
+        let qid = quiz.get();
+        let err = match self.0.execute("UPDATE quiz SET answer = $3 WHERE author = $1 id = $2", &[&uid, &qid, &answer]).await {
             Ok(1) => return Ok(()),
             Ok(0) => return Err(error::Error::NotFound),
             Err(err) => err,
