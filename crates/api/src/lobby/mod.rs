@@ -78,6 +78,8 @@ impl Bot {
         match name.as_str() {
             "create" => self.on_create_command(id, &options).await,
             "list" => self.on_list_command(id).await,
+            "add" => self.on_add_choice(id, &options).await,
+            "remove" => self.on_remove_choice(id, &options),
             "edit" => self.on_edit_command(id, &options),
             "start" => self.on_start_command(id, &options),
             "help" => todo!(),
@@ -95,6 +97,10 @@ impl Bot {
             return Err(error::Error::InvalidParams);
         };
 
+        if name.as_str() != "question" {
+            return Err(error::Error::UnknownCommandName);
+        }
+
         let qid = match self.db.init_quiz(uid.into_nonzero(), value.as_str()).await {
             Ok(id) => id,
             Err(db::error::Error::BadInput) => return Err(error::Error::InvalidParams),
@@ -111,10 +117,7 @@ impl Bot {
         })
     }
 
-    async fn on_list_command(
-        &self,
-        uid: Id<UserMarker>,
-    ) -> error::Result<InteractionResponse> {
+    async fn on_list_command(&self, uid: Id<UserMarker>) -> error::Result<InteractionResponse> {
         use db::TryStreamExt;
         let fields: Vec<_> = self
             .db
@@ -158,6 +161,51 @@ impl Bot {
                 }
             }),
         })
+    }
+
+    async fn on_add_choice(
+        &self,
+        uid: Id<UserMarker>,
+        options: &[CommandDataOption],
+    ) -> error::Result<InteractionResponse> {
+        let [
+            CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
+            CommandDataOption { name: choice_arg, value: CommandOptionValue::String(choice) },
+        ] = options else {
+            return Err(error::Error::InvalidParams);
+        };
+
+        if qid_arg.as_str() != "quiz" || choice_arg.as_str() != "choice" {
+            return Err(error::Error::UnknownCommandName);
+        }
+
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
+        let Err(err) = self.db.add_choice(uid.into_nonzero(), qid, choice.as_str()).await else {
+            return Ok(InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    content: Some(alloc::format!("Successfully added new choice to quiz **[{qid}]**.")),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }),
+            });
+        };
+
+        use db::error::Error as DbError;
+        Err(match err {
+            DbError::NotFound => error::Error::UnknownQuiz,
+            DbError::BadInput | DbError::TooMany => error::Error::InvalidParams,
+            DbError::Fatal => error::Error::Fatal,
+        })
+    }
+
+    fn on_remove_choice(
+        &self,
+        uid: Id<UserMarker>,
+        options: &[CommandDataOption],
+    ) -> error::Result<InteractionResponse> {
+        todo!()
     }
 
     fn on_edit_command(
