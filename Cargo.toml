@@ -13,9 +13,8 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 api = { path = "crates/api", package = "quizzo-api" }
-env_logger = { version = "0.9", default-features = false }
+env_logger = { version = "0.10", default-features = false }
 hex = { version = "0.4", default-features = false }
-rand_chacha = { version = "0.3", default-features = false }
 
 [dependencies.hyper]
 version = "0.14"
@@ -23,7 +22,7 @@ default-features = false
 features = ["http1", "server"]
 
 [dependencies.tokio]
-version = "1.20"
+version = "1.27"
 default-features = false
 features = ["macros", "rt-multi-thread", "parking_lot", "signal"]
 

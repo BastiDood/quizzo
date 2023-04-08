@@ -6,19 +6,18 @@ pub enum Error {
     UnknownQuiz,
     UnknownUser,
     UnknownCommandName,
-    Unrecoverable,
+    Fatal,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Error::*;
         f.write_str(match self {
-            UnsupportedInteraction => "Unsupported interaction.",
-            UnknownQuiz => "Quiz not found. It may have already expired.",
-            UnknownUser => "Unknown user.",
-            UnknownCommandName => "Unknown command name.",
-            InvalidParams => "Invalid parameter list.",
-            Unrecoverable => "Oops! We have encountered an unrecoverable error on our end.",
+            Self::UnsupportedInteraction => "Unsupported interaction.",
+            Self::UnknownQuiz => "Quiz not found. It may have already expired.",
+            Self::UnknownUser => "Unknown user.",
+            Self::UnknownCommandName => "Unknown command name.",
+            Self::InvalidParams => "Invalid parameter list.",
+            Self::Fatal => "Oops! We have encountered an unrecoverable error on our end.",
         })
     }
 }

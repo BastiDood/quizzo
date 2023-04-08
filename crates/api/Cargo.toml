@@ -1,42 +1,21 @@
 [package]
 name = "quizzo-api"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 
 [dependencies]
-blake3 = { version = "1.3", default-features = false }
 dashmap = { version = "5.3", default-features = false }
 db = { path = "../db", package = "quizzo-db" }
 log = "0.4"
-model = { path = "../model", package = "quizzo-model" }
-parking_lot = "0.12"
-percent-encoding = "2.1"
-rand_core = { version = "0.6", default-features = false }
-ring = { version = "0.16", default-features = false }
 serde_json = "1"
-twilight-model = "0.13"
-
-[dependencies.hex]
-version = "0.4"
-default-features = false
-features = ["alloc"]
-
-[dependencies.hyper]
-version = "0.14"
-default-features = false
-features = ["client", "http1"]
-
-[dependencies.hyper-trust-dns]
-version = "0.4"
-default-features = false
-features = ["https-only", "rustls-http1", "rustls-native"]
+twilight-model = "0.15"
 
 [dependencies.tokio]
-version = "1.20"
+version = "1.27"
 default-features = false
 features = ["macros", "sync", "time"]
 
 [dependencies.twilight-http]
-version = "0.13"
+version = "0.15"
 default-features = false
 features = ["decompression", "rustls-native-roots", "trust-dns"]
