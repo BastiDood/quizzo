@@ -1,23 +1,29 @@
 mod error;
 
-use alloc::{string::String, vec::Vec};
-use core::num::NonZeroI16;
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use core::num::{NonZeroI16, NonZeroU64};
 use db::Database;
 use tokio::sync::mpsc;
 use twilight_model::{
     application::interaction::{
         application_command::{CommandData, CommandDataOption, CommandOptionValue},
+        message_component::MessageComponentInteractionData,
         Interaction, InteractionData, InteractionType,
     },
     channel::message::{
+        component::{ComponentType, SelectMenu, SelectMenuOption},
         embed::{EmbedAuthor, EmbedField},
-        Embed, MessageFlags,
+        Component, Embed, MessageFlags,
     },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
-    id::{marker::UserMarker, Id},
+    id::{
+        marker::{ApplicationMarker, UserMarker},
+        Id,
+    },
     user::User,
 };
 
+type AppId = Id<ApplicationMarker>;
 type UserId = Id<UserMarker>;
 
 struct Event {
@@ -26,17 +32,26 @@ struct Event {
 }
 
 type Channel = mpsc::UnboundedSender<Event>;
-type Registry = dashmap::DashMap<NonZeroI16, Channel>;
+type Registry = dashmap::DashMap<(UserId, NonZeroI16), Channel>;
 
-pub struct Bot {
+struct Inner {
     client: twilight_http::Client,
     quizzes: Registry,
+}
+
+pub struct Bot {
+    inner: Arc<Inner>,
     db: Database,
+    id: AppId,
 }
 
 impl Bot {
-    pub fn new(db: Database, token: String) -> Self {
-        Self { client: twilight_http::Client::new(token), quizzes: Registry::new(), db }
+    pub fn new(db: Database, id: NonZeroU64, token: String) -> Self {
+        Self {
+            inner: Arc::new(Inner { client: twilight_http::Client::new(token), quizzes: Registry::new() }),
+            db,
+            id: Id::from(id),
+        }
     }
 
     pub async fn on_message(&self, interaction: Interaction) -> InteractionResponse {
@@ -77,14 +92,17 @@ impl Bot {
         let InteractionData::ApplicationCommand(data) = data else {
             return Err(error::Error::Fatal);
         };
+
+        let token = interaction.token.into_boxed_str();
         let CommandData { name, options, .. } = *data;
+
         match name.as_str() {
             "create" => self.on_create_command(user.id, &options).await,
             "list" => self.on_list_command(user).await,
             "add" => self.on_add_choice(user.id, &options).await,
             "remove" => self.on_remove_choice(user.id, &options).await,
             "edit" => self.on_edit_command(user.id, &options).await,
-            "start" => self.on_start_command(user.id, &options).await,
+            "start" => self.on_start_command(user.id, &options, token).await,
             "help" => todo!(),
             _ => Err(error::Error::Fatal),
         }
@@ -251,11 +269,102 @@ impl Bot {
         todo!()
     }
 
-    async fn on_start_command(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
-        todo!()
+    async fn on_start_command(
+        &self,
+        uid: UserId,
+        options: &[CommandDataOption],
+        token: Box<str>,
+    ) -> error::Result<InteractionResponse> {
+        let option = options.first().ok_or(error::Error::InvalidParams)?;
+        let CommandDataOption { name, value: CommandOptionValue::Integer(qid) } = option else {
+            return Err(error::Error::InvalidParams);
+        };
+
+        if name != "start" {
+            return Err(error::Error::UnknownCommandName);
+        }
+
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
+        let db::RawQuiz { question, choices, answer, expiration } =
+            match self.db.pop_quiz(uid.into_nonzero(), qid).await {
+                Ok(quiz) => quiz,
+                Err(db::error::Error::NotFound) => return Err(error::Error::UnknownQuiz),
+                _ => return Err(error::Error::Fatal),
+            };
+
+        let key = (uid, qid);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        if self.inner.quizzes.insert(key, tx).is_some() {
+            return Err(error::Error::Fatal);
+        }
+
+        let app_id = self.id;
+        let duration = core::time::Duration::from_secs(expiration.into());
+        let inner = self.inner.clone();
+        let correct = choices[usize::try_from(answer).unwrap()].clone();
+        tokio::spawn(async move {
+            let mut users = alloc::collections::BTreeSet::new();
+            let mut sleep = core::pin::pin!(tokio::time::sleep(duration));
+            loop {
+                let Event { user, choice } = tokio::select! {
+                    Some(msg) = rx.recv() => msg,
+                    _ = &mut sleep => break,
+                    else => break,
+                };
+                if answer == choice {
+                    users.insert(user);
+                }
+            }
+
+            drop(rx);
+            inner.quizzes.remove(&key);
+
+            let mentions: Vec<_> = users.into_iter().map(|user| alloc::format!("<@{user}>")).collect();
+            let mentions = mentions.join(" ").into_boxed_str();
+            let content = alloc::format!("The correct answer is: ||{correct}||. Congratulations to {mentions}!");
+            inner.client.interaction(app_id).create_followup(&token).content(&content).unwrap().await.unwrap();
+        });
+
+        use alloc::string::ToString;
+        Ok(InteractionResponse {
+            kind: InteractionResponseType::DeferredUpdateMessage,
+            data: Some(InteractionResponseData {
+                content: Some(question),
+                components: Some(alloc::vec![Component::SelectMenu(SelectMenu {
+                    custom_id: alloc::format!("{uid}:{qid}"),
+                    min_values: Some(1),
+                    max_values: Some(1),
+                    disabled: false,
+                    placeholder: Some(String::from("Your Answer")),
+                    options: choices
+                        .into_iter()
+                        .enumerate()
+                        .map(|(id, choice)| SelectMenuOption {
+                            default: false,
+                            description: None,
+                            emoji: None,
+                            label: choice,
+                            value: id.to_string(),
+                        })
+                        .collect(),
+                })]),
+                ..Default::default()
+            }),
+        })
     }
 
     async fn on_msg_component(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
+        let user =
+            interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
+        let data = interaction.data.ok_or(error::Error::Fatal)?;
+        let InteractionData::MessageComponent(MessageComponentInteractionData {
+            component_type: ComponentType::SelectMenu,
+            custom_id,
+            values,
+        }) = data else {
+            return Err(error::Error::Fatal);
+        };
         todo!()
     }
 }

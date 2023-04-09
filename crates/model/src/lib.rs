@@ -12,7 +12,7 @@ pub struct RawQuiz {
     /// Possible answers to select from.
     pub choices: Vec<String>,
     /// Index of the selection with the correct answer.
-    pub answer: Option<u32>,
+    pub answer: u32,
     /// How long to wait before expiring the poll (in seconds).
     pub expiration: u32,
 }

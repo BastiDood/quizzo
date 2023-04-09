@@ -97,7 +97,7 @@ impl Database {
         let row = self
             .0
             .query_opt(
-                "DELETE FROM quiz WHERE author = $1, id = $2 RETURNING question, choices, answer, timeout",
+                "DELETE FROM quiz WHERE author = $1 AND id = $2 AND answer IS NOT NULL RETURNING question, choices, answer, timeout",
                 &[&uid, &qid],
             )
             .await
