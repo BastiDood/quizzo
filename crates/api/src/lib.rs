@@ -26,12 +26,17 @@ impl App {
     pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {
         use hyper::{http::request::Parts, Method};
         let (Parts { uri, method, headers, .. }, body) = req.into_parts();
+        let path = uri.path();
+
+        if method == Method::GET && path == "/healthz" {
+            return Ok(Response::new(Body::empty()));
+        }
 
         if method != Method::POST {
             return Err(StatusCode::METHOD_NOT_ALLOWED);
         }
 
-        if uri.path() != "/discord" {
+        if path != "/discord" {
             return Err(StatusCode::NOT_FOUND);
         }
 
