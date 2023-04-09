@@ -250,13 +250,14 @@ mod tests {
     async fn database_test() {
         use std::env::var;
         let user = var("PG_USERNAME").unwrap();
+        let pass = var("PG_PASSWORD").unwrap();
         let host = var("PG_HOSTNAME").unwrap();
         let data = var("PG_DATABASE").unwrap();
 
         // Dummy credentials for the database
         let (client, conn) = Config::new()
             .user(&user)
-            .password("")
+            .password(&pass)
             .host(&host)
             .dbname(&data)
             .port(5432)

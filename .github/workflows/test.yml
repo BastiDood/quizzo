@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo systemctl start postgresql.service
           pg_isready
-          sudo -u postgres psql -c 'CREATE USER runner'
+          sudo -u postgres psql -c "CREATE USER runner PASSWORD 'password'"
           sudo -u postgres createdb -O runner quizzo
       - name: Setup PostgreSQL Database
         run: psql -f scripts/init.sql -1 quizzo
@@ -41,5 +41,6 @@ jobs:
         run: cargo test --all
         env:
           PG_USERNAME: runner
+          PG_PASSWORD: password
           PG_HOSTNAME: 127.0.0.1
           PG_DATABASE: quizzo
