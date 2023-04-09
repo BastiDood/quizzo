@@ -23,7 +23,7 @@ jobs:
           sudo -u postgres psql -c 'CREATE USER runner'
           sudo -u postgres createdb -O runner quizzo
       - name: Setup PostgreSQL Database
-        run: psql -f db/init.sql -1 doctrack
+        run: psql -f db/init.sql -1 quizzo
       - name: Check Format
         run: cargo fmt --check
       - name: Check Clippy Lints
