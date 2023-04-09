@@ -256,6 +256,7 @@ mod tests {
         // Dummy credentials for the database
         let (client, conn) = Config::new()
             .user(&user)
+            .password("")
             .host(&host)
             .dbname(&data)
             .port(5432)
