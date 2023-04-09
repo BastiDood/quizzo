@@ -261,7 +261,11 @@ impl Bot {
         }
     }
 
-    async fn on_edit_command(&self, _uid: UserId, _options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
+    async fn on_edit_command(
+        &self,
+        _uid: UserId,
+        _options: &[CommandDataOption],
+    ) -> error::Result<InteractionResponse> {
         todo!()
     }
 
