@@ -261,12 +261,59 @@ impl Bot {
         }
     }
 
-    async fn on_edit_command(
-        &self,
-        _uid: UserId,
-        _options: &[CommandDataOption],
-    ) -> error::Result<InteractionResponse> {
-        todo!()
+    async fn on_edit_command(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
+        let data = options.first().ok_or(error::Error::Fatal)?;
+        let CommandDataOption { name, value: CommandOptionValue::SubCommand(args) } = data else {
+            return Err(error::Error::Fatal);
+        };
+
+        if name != "edit" {
+            return Err(error::Error::UnknownCommandName);
+        }
+
+        let [
+            CommandDataOption { name: qid_name, value: CommandOptionValue::Integer(qid) },
+            CommandDataOption { name: arg_name, value: arg },
+        ] = args.as_slice() else {
+            return Err(error::Error::InvalidParams);
+        };
+
+        if qid_name.as_str() != "quiz" {
+            return Err(error::Error::Fatal);
+        }
+
+        let uid = uid.into_nonzero();
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::Fatal)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::Fatal)?;
+        let result = match (arg_name.as_str(), arg) {
+            ("question", CommandOptionValue::String(question)) => {
+                let q = question.as_str();
+                self.db.set_question(uid, qid, q).await
+            }
+            ("expiration", CommandOptionValue::Integer(expiration)) => {
+                let exp = u16::try_from(*expiration).map_err(|_| error::Error::InvalidParams)?;
+                self.db.set_expiration(uid, qid, exp).await
+            }
+            _ => return Err(error::Error::UnknownCommandName),
+        };
+
+        let Err(err) = result else {
+            return Ok(InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    content: Some(alloc::format!("The {arg_name} property has been edited.")),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }),
+            })
+        };
+
+        use db::error::Error as DbError;
+        Err(match err {
+            DbError::NotFound => error::Error::UnknownQuiz,
+            DbError::BadInput => error::Error::InvalidParams,
+            _ => error::Error::Fatal,
+        })
     }
 
     async fn on_start_command(
