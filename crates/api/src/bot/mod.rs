@@ -310,6 +310,8 @@ impl Bot {
                 };
                 if answer == choice {
                     users.insert(user);
+                } else {
+                    users.remove(&user);
                 }
             }
 
