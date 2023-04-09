@@ -181,11 +181,7 @@ impl Bot {
         })
     }
 
-    async fn on_add_choice(
-        &self,
-        uid: Id<UserMarker>,
-        options: &[CommandDataOption],
-    ) -> error::Result<InteractionResponse> {
+    async fn on_add_choice(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
         let [
             CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: choice_arg, value: CommandOptionValue::String(choice) },
@@ -218,11 +214,7 @@ impl Bot {
         })
     }
 
-    async fn on_remove_choice(
-        &self,
-        uid: Id<UserMarker>,
-        options: &[CommandDataOption],
-    ) -> error::Result<InteractionResponse> {
+    async fn on_remove_choice(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
         let [
             CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: index_arg, value: CommandOptionValue::Integer(index) },
@@ -255,19 +247,11 @@ impl Bot {
         })
     }
 
-    async fn on_edit_command(
-        &self,
-        uid: Id<UserMarker>,
-        options: &[CommandDataOption],
-    ) -> error::Result<InteractionResponse> {
+    async fn on_edit_command(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
         todo!()
     }
 
-    async fn on_start_command(
-        &self,
-        uid: Id<UserMarker>,
-        options: &[CommandDataOption],
-    ) -> error::Result<InteractionResponse> {
+    async fn on_start_command(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
         todo!()
     }
 
