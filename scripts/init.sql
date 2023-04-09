@@ -15,6 +15,6 @@ CREATE TABLE quiz(
     answer SMALLINT
         CHECK(answer IS NULL OR 0 <= answer AND answer < ARRAY_LENGTH(choices, 1)),
     -- Number of seconds before the quiz expires.
-    expiration SMALLINT NOT NULL DEFAULT 10 CHECK(timeout BETWEEN 10 AND 600),
+    expiration SMALLINT NOT NULL DEFAULT 10 CHECK(expiration BETWEEN 10 AND 600),
     PRIMARY KEY (id, author)
 );
