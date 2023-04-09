@@ -1,5 +1,5 @@
 const APP_ID = Deno.env.get('APP_ID');
-const TOKEN = Deno.env.get('TOKEN');
+const TOKEN = Deno.env.get('BOT_TOKEN');
 const GUILD_ID = Deno.env.get('GUILD_ID');
 
 // Ensure that `APP_ID` and `TOKEN` are available
