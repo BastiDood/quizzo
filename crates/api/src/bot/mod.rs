@@ -246,7 +246,7 @@ impl Bot {
 
         let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
         let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
-        let index = u16::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
+        let index = u32::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
         match self.db.remove_choice(uid.into_nonzero(), qid, index).await {
             Ok(choice) => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
@@ -288,6 +288,10 @@ impl Bot {
                 Err(db::error::Error::NotFound) => return Err(error::Error::UnknownQuiz),
                 _ => return Err(error::Error::Fatal),
             };
+        let Some(answer) = answer else {
+            return Err(error::Error::Fatal);
+        };
+        let expiration = u64::try_from(expiration).map_err(|_| error::Error::Fatal)?;
 
         let key = (uid, qid);
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -296,7 +300,7 @@ impl Bot {
         }
 
         let app_id = self.id;
-        let duration = core::time::Duration::from_secs(expiration.into());
+        let duration = core::time::Duration::from_secs(expiration);
         let inner = self.inner.clone();
         let correct = choices[usize::try_from(answer).unwrap()].clone();
         tokio::spawn(async move {
@@ -308,7 +312,7 @@ impl Bot {
                     _ = &mut sleep => break,
                     else => break,
                 };
-                if answer == choice {
+                if i64::from(answer) == i64::from(choice) {
                     users.insert(user);
                 } else {
                     users.remove(&user);

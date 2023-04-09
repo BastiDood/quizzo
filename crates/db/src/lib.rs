@@ -1,4 +1,5 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+
 extern crate alloc;
 
 pub mod error;
@@ -39,7 +40,7 @@ impl Database {
         let uid = user.get() as i64;
         let err = match self
             .0
-            .query_opt("INSERT INTO quiz (user, question) VALUES ($1, $2) RETURNING id", &[&uid, &question])
+            .query_opt("INSERT INTO quiz (author, question) VALUES ($1, $2) RETURNING id", &[&uid, &question])
             .await
         {
             Ok(row) => {
@@ -98,7 +99,7 @@ impl Database {
         let row = self
             .0
             .query_opt(
-                "DELETE FROM quiz WHERE author = $1 AND id = $2 AND answer IS NOT NULL RETURNING question, choices, answer, timeout",
+                "DELETE FROM quiz WHERE author = $1 AND id = $2 AND answer IS NOT NULL RETURNING question, choices, answer, expiration",
                 &[&uid, &qid],
             )
             .await
@@ -136,14 +137,18 @@ impl Database {
         })
     }
 
-    pub async fn remove_choice(&self, user: NonZeroU64, quiz: NonZeroI16, index: u16) -> error::Result<Box<str>> {
+    pub async fn remove_choice(&self, user: NonZeroU64, quiz: NonZeroI16, index: u32) -> error::Result<Box<str>> {
+        let index = i32::try_from(index).map_err(|_| error::Error::BadInput)?;
         let uid = user.get() as i64;
         let qid = quiz.get();
-        let index = i16::try_from(index).map_err(|_| error::Error::BadInput)?;
         let row = self
             .0
             .query_opt(
-                "UPDATE quiz SET answer = DEFAULT, choices = choices[1:$3] || choices[$3+2:] WHERE author = $1 AND id = $2 RETURNING choices[$3+1] AS choice",
+                "WITH old AS (SELECT * FROM quiz WHERE author = $1 AND id = $2) \
+                 UPDATE quiz SET answer = DEFAULT, choices = quiz.choices[1:$3] || quiz.choices[$3+2:] \
+                 FROM old \
+                 WHERE quiz.author = old.author AND quiz.id = old.id \
+                 RETURNING old.choices[$3+1] AS choice",
                 &[&uid, &qid, &index],
             )
             .await
@@ -180,17 +185,20 @@ impl Database {
         Err(error::Error::BadInput)
     }
 
-    pub async fn set_answer(&self, user: NonZeroU64, quiz: NonZeroI16, answer: u32) -> error::Result<()> {
+    pub async fn set_answer(&self, user: NonZeroU64, quiz: NonZeroI16, answer: u16) -> error::Result<()> {
+        let answer = i16::try_from(answer).map_err(|_| error::Error::BadInput)?;
         let uid = user.get() as i64;
         let qid = quiz.get();
-        let err =
-            match self.0.execute("UPDATE quiz SET answer = $3 WHERE author = $1 id = $2", &[&uid, &qid, &answer]).await
-            {
-                Ok(1) => return Ok(()),
-                Ok(0) => return Err(error::Error::NotFound),
-                Err(err) => err,
-                _ => return Err(error::Error::Fatal),
-            };
+        let err = match self
+            .0
+            .execute("UPDATE quiz SET answer = $3 WHERE author = $1 AND id = $2", &[&uid, &qid, &answer])
+            .await
+        {
+            Ok(1) => return Ok(()),
+            Ok(0) => return Err(error::Error::NotFound),
+            Err(err) => err,
+            _ => return Err(error::Error::Fatal),
+        };
 
         let err = err.as_db_error().ok_or(error::Error::Fatal)?;
         if *err.code() != SqlState::CHECK_VIOLATION {
@@ -203,5 +211,117 @@ impl Database {
         }
 
         Err(error::Error::BadInput)
+    }
+
+    pub async fn set_expiration(&self, user: NonZeroU64, quiz: NonZeroI16, expiration: u16) -> error::Result<()> {
+        let expiration = i16::try_from(expiration).map_err(|_| error::Error::BadInput)?;
+        let uid = user.get() as i64;
+        let qid = quiz.get();
+        let err = match self
+            .0
+            .execute("UPDATE quiz SET expiration = $3 WHERE author = $1 AND id = $2", &[&uid, &qid, &expiration])
+            .await
+        {
+            Ok(1) => return Ok(()),
+            Ok(0) => return Err(error::Error::NotFound),
+            Err(err) => err,
+            _ => return Err(error::Error::Fatal),
+        };
+
+        let err = err.as_db_error().ok_or(error::Error::Fatal)?;
+        if *err.code() != SqlState::CHECK_VIOLATION {
+            return Err(error::Error::Fatal);
+        }
+
+        let constraint = err.constraint().ok_or(error::Error::Fatal)?;
+        if constraint != "expiration_check" {
+            return Err(error::Error::Fatal);
+        }
+
+        Err(error::Error::BadInput)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Config, Database, NoTls, NonZeroU64, Quiz, TryStreamExt};
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn database_test() {
+        use std::env::var;
+        let user = var("PG_USERNAME").unwrap();
+        let host = var("PG_HOSTNAME").unwrap();
+        let data = var("PG_DATABASE").unwrap();
+
+        // Dummy credentials for the database
+        let (client, conn) = Config::new()
+            .user(&user)
+            .host(&host)
+            .dbname(&data)
+            .port(5432)
+            .connect(NoTls)
+            .await
+            .expect("cannot connect to database");
+        let handle = tokio::spawn(conn);
+        let db = Database::from(client);
+
+        // Quiz creation
+        let uid = NonZeroU64::new(10).unwrap();
+        let qid = db.init_quiz(uid, "Hello world?").await.unwrap();
+
+        // Initial quiz retrieval
+        let init = db.get_quiz(uid, qid).await.unwrap();
+        assert_eq!(init.question, "Hello world?");
+        assert!(init.answer.is_none());
+        assert_eq!(init.expiration, 10);
+        assert!(init.choices.is_empty());
+
+        // Get all quizzes from the user
+        let quizzes: Vec<_> = db.get_quizzes_by_user(uid).await.unwrap().try_collect().await.unwrap();
+        assert_eq!(quizzes.as_slice(), &[Quiz { id: qid, raw: init }]);
+        drop(quizzes);
+
+        // Set new quiz parameters
+        db.set_question(uid, qid, "What is the largest planet in the solar system?").await.unwrap();
+        db.set_expiration(uid, qid, 50).await.unwrap();
+
+        // Add new choices
+        db.add_choice(uid, qid, "Mercury").await.unwrap();
+        db.add_choice(uid, qid, "Venus").await.unwrap();
+        db.add_choice(uid, qid, "Earth").await.unwrap();
+        db.add_choice(uid, qid, "Titan").await.unwrap();
+        db.add_choice(uid, qid, "Mars").await.unwrap();
+        db.add_choice(uid, qid, "Jupiter").await.unwrap();
+        db.add_choice(uid, qid, "Saturn").await.unwrap();
+        db.add_choice(uid, qid, "Ganymede").await.unwrap();
+        db.add_choice(uid, qid, "Uranus").await.unwrap();
+        db.add_choice(uid, qid, "Neptune").await.unwrap();
+        db.add_choice(uid, qid, "Orion").await.unwrap();
+        db.add_choice(uid, qid, "Pluto").await.unwrap();
+
+        // Remove invalid choices
+        assert_eq!(db.remove_choice(uid, qid, 3).await.unwrap().as_ref(), "Titan");
+        assert_eq!(db.remove_choice(uid, qid, 6).await.unwrap().as_ref(), "Ganymede");
+        assert_eq!(db.remove_choice(uid, qid, 8).await.unwrap().as_ref(), "Orion");
+
+        // Set a new answer
+        db.set_answer(uid, qid, 4).await.unwrap();
+
+        // Pop the answer off
+        let quiz = db.pop_quiz(uid, qid).await.unwrap();
+        assert_eq!(quiz.question, "What is the largest planet in the solar system?");
+        assert_eq!(quiz.answer.unwrap(), 4);
+        assert_eq!(quiz.expiration, 50);
+        assert_eq!(
+            quiz.choices.as_slice(),
+            vec!["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]
+        );
+
+        // Verify that the quiz has been removed
+        let quizzes: Vec<_> = db.get_quizzes_by_user(uid).await.unwrap().try_collect().await.unwrap();
+        assert!(quizzes.is_empty());
+
+        drop(db);
+        handle.await.unwrap().unwrap();
     }
 }

@@ -746,6 +746,8 @@ version = "0.6.0"
 dependencies = [
  "futures-util",
  "quizzo-model",
+ "serde",
+ "tokio",
  "tokio-postgres",
 ]
 

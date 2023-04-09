@@ -67,8 +67,7 @@ fn main() -> anyhow::Result<()> {
                             Ok::<_, core::convert::Infallible>(response)
                         }
                     });
-                    let future = http.serve_connection(stream, service);
-                    runtime.spawn(async { future.await.unwrap() });
+                    runtime.spawn(http.serve_connection(stream, service));
                     continue;
                 }
                 stop_res = &mut stop => {

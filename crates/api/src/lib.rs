@@ -51,7 +51,6 @@ impl App {
         // Validate the challenge
         self.public.verify(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
         drop(message);
-        drop(signature);
 
         // Parse incoming interaction
         let interaction = serde_json::from_slice(&payload).map_err(|_| StatusCode::BAD_REQUEST)?;

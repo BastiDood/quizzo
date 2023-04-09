@@ -10,3 +10,13 @@ tokio-postgres = "0.7"
 [dependencies.futures-util]
 version = "0.3"
 default-features = false
+
+[dependencies.serde]
+version = "1"
+default-features = false
+features = ["alloc"]
+
+[dev-dependencies.tokio]
+version = "1.27"
+default-features = false
+features = ["macros", "rt"]
