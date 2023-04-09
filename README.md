@@ -4,41 +4,30 @@ _Quizzo_ is a [Discord bot](https://discord.com/api/oauth2/authorize?client_id=8
 # Development
 This bot is powered by the [Twilight library](https://github.com/twilight-rs/twilight) for the [Rust programming language](https://www.rust-lang.org/tools/install). Before running the bot, the following environment variables must be set:
 
-**Variable**    | **Description**
-----------------|-----------------------------------------------------------------------------------------------------
-`PUB_KEY`       | Hex-encoded cryptograhpic public key provided by the [Discord Developer Portal][discord].
-`APP_ID`        | Application ID provided by the [Discord Developer Portal][discord].
-`CLIENT_ID`     | Client ID provided by the [Discord Developer Portal][discord].
-`CLIENT_SECRET` | Client secret provided by the [Discord Developer Portal][discord].
-`REDIRECT_URI`  | Redirect URI to be used when redirecting the user during the [OAuth Authorization Code Flow][oauth].
-`TOKEN`         | Bot token provided by the [Discord Developer Portal][discord].
-`MONGODB_URI`   | [MongoDB URI connection string][mongodb] that should be used as the database.
-`PORT`          | Network port to bind to when launching the bot.
+**Variable**  | **Description**                                                                           | Required? | Default
+------------- | ----------------------------------------------------------------------------------------- | :-------: | ------:
+`PORT`        | Network port to bind to when launching the bot.                                           | &#x2714   |
+`PUB_KEY`     | Hex-encoded cryptograhpic public key provided by the [Discord Developer Portal][discord]. | &#x2714   |
+`BOT_TOKEN`   | Bot token provided by the [Discord Developer Portal][discord].                            | &#x2714   |
+`PG_PORT`     | Port at which the PostgreSQL instance is hosted.                                          | &#x274c   | `5432`
+`PG_HOSTNAME` | Hostname at which the PostgreSQL instance is hosted.                                      | &#x2714   |
+`PG_DATABASE` | Default database to which the PostgreSQL driver must connect to.                          | &#x2714   |
+`PG_USERNAME` | Username for PostgreSQL user authentication.                                              | &#x2714   |
+`PG_PASSWORD` | Password for PostgreSQL user authentication.                                              | &#x2714   |
 
-[mongodb]: https://www.mongodb.com/docs/manual/reference/connection-string/
 [discord]: https://discord.com/developers/applications
-[oauth]: https://discord.com/developers/docs/topics/oauth2#authorization-code-grant
 
 Once these are available, one may use Rust's built-in package manager [Cargo](https://doc.rust-lang.org/cargo/) to launch the bot.
 
 ```bash
-# Load OAuth environment variables
-CLIENT_ID=
-CLIENT_SECRET=
-REDIRECT_URI=
-
-# Load Discord environment variables
-APP_ID=
-TOKEN=
-PUB_KEY=
-
-# Load network environment variables
-PORT=
-
 # Register the required commands
+BOT_TOKEN=
 GUILD_ID=
 deno run --allow-net --allow-env scripts/register-commands.ts
 
 # Start the bot!
+PORT=
+PUB_KEY=
+PG_PORT=5432
 cargo run --release
 ```
