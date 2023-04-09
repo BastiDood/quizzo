@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Setup Repository
+        uses: actions/checkout@v3
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Startup Built-in PostgreSQL Server
+        run: |
+          sudo systemctl start postgresql.service
+          pg_isready
+          sudo -u postgres psql -c 'CREATE USER runner'
+          sudo -u postgres createdb -O runner quizzo
+      - name: Setup PostgreSQL Database
+        run: psql -f db/init.sql -1 doctrack
+      - name: Check Format
+        run: cargo fmt --check
+      - name: Check Clippy Lints
+        run: cargo clippy
+      - name: Run Tests
+        run: cargo test --all
+        env:
+          PG_USERNAME: runner
+          PG_HOSTNAME: 127.0.0.1
+          PG_DATABASE: quizzo
