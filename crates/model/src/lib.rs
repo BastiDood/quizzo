@@ -1,16 +1,16 @@
 #![no_std]
 extern crate alloc;
 
-use alloc::boxed::Box;
+use alloc::{string::String, vec::Vec};
 use core::num::NonZeroI16;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct RawQuiz {
     /// Question to be displayed in chat.
-    pub question: Box<str>,
+    pub question: String,
     /// Possible answers to select from.
-    pub choices: Box<[Box<str>]>,
+    pub choices: Vec<String>,
     /// Index of the selection with the correct answer.
     pub answer: Option<u32>,
     /// How long to wait before expiring the poll (in seconds).

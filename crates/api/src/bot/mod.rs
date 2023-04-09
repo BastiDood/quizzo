@@ -9,7 +9,10 @@ use twilight_model::{
         application_command::{CommandData, CommandDataOption, CommandOptionValue},
         Interaction, InteractionData, InteractionType,
     },
-    channel::message::{embed::EmbedField, Embed, MessageFlags},
+    channel::message::{
+        embed::{EmbedAuthor, EmbedField},
+        Embed, MessageFlags,
+    },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{marker::UserMarker, Id},
     user::User,
@@ -68,7 +71,7 @@ impl Bot {
     }
 
     async fn on_app_command(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
-        let User { id, .. } =
+        let user =
             interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
         let data = interaction.data.ok_or(error::Error::Fatal)?;
         let InteractionData::ApplicationCommand(data) = data else {
@@ -76,12 +79,12 @@ impl Bot {
         };
         let CommandData { name, options, .. } = *data;
         match name.as_str() {
-            "create" => self.on_create_command(id, &options).await,
-            "list" => self.on_list_command(id).await,
-            "add" => self.on_add_choice(id, &options).await,
-            "remove" => self.on_remove_choice(id, &options).await,
-            "edit" => self.on_edit_command(id, &options).await,
-            "start" => self.on_start_command(id, &options).await,
+            "create" => self.on_create_command(user.id, &options).await,
+            "list" => self.on_list_command(user).await,
+            "add" => self.on_add_choice(user.id, &options).await,
+            "remove" => self.on_remove_choice(user.id, &options).await,
+            "edit" => self.on_edit_command(user.id, &options).await,
+            "start" => self.on_start_command(user.id, &options).await,
             "help" => todo!(),
             _ => Err(error::Error::Fatal),
         }
@@ -117,24 +120,52 @@ impl Bot {
         })
     }
 
-    async fn on_list_command(&self, uid: Id<UserMarker>) -> error::Result<InteractionResponse> {
+    async fn on_list_command(&self, user: User) -> error::Result<InteractionResponse> {
         use db::TryStreamExt;
-        let fields: Vec<_> = self
+        let embeds: Vec<_> = self
             .db
-            .get_quizzes_by_user(uid.into_nonzero())
+            .get_quizzes_by_user(user.id.into_nonzero())
             .await
             .map_err(|_| error::Error::Fatal)?
-            .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, .. } }| EmbedField {
-                inline: false,
-                name: alloc::format!("**[{id}]:** {question}"),
-                value: alloc::format!("{expiration}-second timeout with {} choices.", choices.len()),
+            .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, .. } }| {
+                let fields = choices
+                    .into_iter()
+                    .zip(1..)
+                    .map(|(choice, id)| EmbedField {
+                        inline: false,
+                        name: alloc::format!("Choice {id}"),
+                        value: choice,
+                    })
+                    .collect();
+                Embed {
+                    fields,
+                    kind: String::from("rich"),
+                    color: Some(user.accent_color.unwrap_or(0x236EA5)),
+                    title: Some(question),
+                    description: Some(alloc::format!("Quiz `{id}` is set to expire in {expiration} seconds.")),
+                    author: Some(EmbedAuthor {
+                        name: alloc::format!("{}#{}", user.name, user.discriminator()),
+                        icon_url: user
+                            .avatar
+                            .map(|hash| alloc::format!("https://cdn.discordapp.com/avatars/{}/{hash}.webp", user.id)),
+                        proxy_icon_url: None,
+                        url: None,
+                    }),
+                    footer: None,
+                    image: None,
+                    provider: None,
+                    thumbnail: None,
+                    timestamp: None,
+                    url: None,
+                    video: None,
+                }
             })
             .map_err(|_| error::Error::Fatal)
             .try_collect()
             .await?;
         Ok(InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
-            data: Some(if fields.is_empty() {
+            data: Some(if embeds.is_empty() {
                 InteractionResponseData {
                     content: Some(String::from("You currently have no quizzes registered.")),
                     flags: Some(MessageFlags::EPHEMERAL),
@@ -142,21 +173,7 @@ impl Bot {
                 }
             } else {
                 InteractionResponseData {
-                    embeds: Some(alloc::vec![Embed {
-                        fields,
-                        kind: String::from("rich"),
-                        color: Some(0x236EA5),
-                        author: None,
-                        description: None,
-                        footer: None,
-                        image: None,
-                        provider: None,
-                        thumbnail: None,
-                        timestamp: None,
-                        title: None,
-                        url: None,
-                        video: None,
-                    }]),
+                    embeds: Some(embeds),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }
