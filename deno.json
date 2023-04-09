@@ -1,0 +1,11 @@
+{
+    "compilerOptions": { "strict": true },
+    "tasks": {
+        "init": "initdb -D data -U postgres -W",
+        "db": "postgres -D data",
+        "template": "psql -U postgres -W -f scripts/init.sql -1 template1",
+        "create": "createdb -U postgres -W quizzo",
+        "drop": "dropdb -U postgres -W quizzo",
+        "register": "deno run --allow-env --allow-net scripts/register.ts"
+    }
+}
