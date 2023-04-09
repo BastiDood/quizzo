@@ -247,22 +247,18 @@ impl Bot {
         let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
         let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
         let index = u16::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
-        let Err(err) = self.db.remove_choice(uid.into_nonzero(), qid, index).await else {
-            return Ok(InteractionResponse {
+        match self.db.remove_choice(uid.into_nonzero(), qid, index).await {
+            Ok(choice) => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
-                    content: Some(alloc::format!("Successfully removed choice `{index}` from quiz **[{qid}]**. The answer has also been reset.")),
+                    content: Some(alloc::format!("Successfully removed choice ||{choice}|| from quiz **[{qid}]**. The answer has also been reset.")),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }),
-            });
-        };
-
-        use db::error::Error as DbError;
-        Err(match err {
-            DbError::NotFound => error::Error::UnknownQuiz,
-            _ => error::Error::Fatal,
-        })
+            }),
+            Err(db::error::Error::NotFound) => Err(error::Error::UnknownQuiz),
+            _ => Err(error::Error::Fatal),
+        }
     }
 
     async fn on_edit_command(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {

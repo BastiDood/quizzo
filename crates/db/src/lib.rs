@@ -3,6 +3,7 @@ extern crate alloc;
 
 pub mod error;
 
+use alloc::boxed::Box;
 use core::num::{NonZeroI16, NonZeroU64};
 use tokio_postgres::error::SqlState;
 
@@ -135,22 +136,21 @@ impl Database {
         })
     }
 
-    pub async fn remove_choice(&self, user: NonZeroU64, quiz: NonZeroI16, index: u16) -> error::Result<()> {
+    pub async fn remove_choice(&self, user: NonZeroU64, quiz: NonZeroI16, index: u16) -> error::Result<Box<str>> {
         let uid = user.get() as i64;
         let qid = quiz.get();
         let index = i16::try_from(index).map_err(|_| error::Error::BadInput)?;
-        match self
+        let row = self
             .0
-            .execute(
-                "UPDATE quiz SET answer = DEFAULT, choices = choices[1:$2-1] || choices[$2+1:NULL] WHERE id = $1",
+            .query_opt(
+                "UPDATE quiz SET answer = DEFAULT, choices = choices[1:$3] || choices[$3+2:] WHERE author = $1 AND id = $2 RETURNING choices[$3+1] AS choice",
                 &[&uid, &qid, &index],
             )
             .await
-        {
-            Ok(1) => Ok(()),
-            Ok(0) => Err(error::Error::NotFound),
-            _ => Err(error::Error::Fatal),
-        }
+            .map_err(|_| error::Error::Fatal)?
+            .ok_or(error::Error::NotFound)?;
+        let choice: Box<str> = row.try_get("choice").map_err(|_| error::Error::Fatal)?;
+        Ok(choice)
     }
 
     pub async fn set_question(&self, user: NonZeroU64, quiz: NonZeroI16, question: &str) -> error::Result<()> {
