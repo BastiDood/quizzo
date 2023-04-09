@@ -103,7 +103,14 @@ impl Bot {
             "remove" => self.on_remove_choice(user.id, &options).await,
             "edit" => self.on_edit_command(user.id, &options).await,
             "start" => self.on_start_command(user.id, &options, token).await,
-            "help" => todo!(),
+            "help" => Ok(InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    content: Some(String::from("Help command coming soon!")),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }),
+            }),
             _ => Err(error::Error::Fatal),
         }
     }
