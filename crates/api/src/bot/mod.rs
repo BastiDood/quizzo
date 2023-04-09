@@ -355,7 +355,7 @@ impl Bot {
     }
 
     async fn on_msg_component(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
-        let user =
+        let User { id, .. } =
             interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
         let data = interaction.data.ok_or(error::Error::Fatal)?;
         let InteractionData::MessageComponent(MessageComponentInteractionData {
@@ -365,6 +365,33 @@ impl Bot {
         }) = data else {
             return Err(error::Error::Fatal);
         };
-        todo!()
+
+        let mut iter = custom_id.splitn(2, ':');
+        let first = iter.next();
+        let second = iter.next();
+        if iter.next().is_some() {
+            return Err(error::Error::Fatal);
+        }
+
+        let (uid, qid) = first.zip(second).ok_or(error::Error::Fatal)?;
+        let uid: NonZeroU64 = uid.parse().map_err(|_| error::Error::Fatal)?;
+        let qid: NonZeroI16 = qid.parse().map_err(|_| error::Error::Fatal)?;
+
+        let choice = values.into_iter().next().ok_or(error::Error::Fatal)?.parse().map_err(|_| error::Error::Fatal)?;
+        self.inner
+            .quizzes
+            .get(&(Id::from(uid), qid))
+            .ok_or(error::Error::UnknownQuiz)?
+            .send(Event { user: id, choice })
+            .map_err(|_| error::Error::UnknownQuiz)?;
+
+        Ok(InteractionResponse {
+            kind: InteractionResponseType::ChannelMessageWithSource,
+            data: Some(InteractionResponseData {
+                content: Some(String::from("Your answer has been successfully recorded.")),
+                flags: Some(MessageFlags::EPHEMERAL),
+                ..Default::default()
+            }),
+        })
     }
 }
