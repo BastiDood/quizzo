@@ -5,6 +5,7 @@ mod bot;
 
 use alloc::{boxed::Box, string::String};
 use bot::Bot;
+use core::num::NonZeroU64;
 use hyper::{Body, Request, Response, StatusCode};
 use ring::signature::UnparsedPublicKey;
 
@@ -18,8 +19,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(db: Database, token: String, public: Box<[u8]>) -> Self {
-        Self { bot: Bot::new(db, token), public: UnparsedPublicKey::new(&ring::signature::ED25519, public) }
+    pub fn new(db: Database, id: NonZeroU64, token: String, public: Box<[u8]>) -> Self {
+        Self { bot: Bot::new(db, id, token), public: UnparsedPublicKey::new(&ring::signature::ED25519, public) }
     }
 
     pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {

@@ -14,6 +14,7 @@ fn main() -> anyhow::Result<()> {
 
     // Set up Postgres driver configuration
     let app_port = var("PORT")?.parse()?;
+    let app_id = var("APP_ID")?.parse()?;
     let bot_token = var("BOT_TOKEN")?;
     let config = {
         let username = var("PG_USERNAME")?;
@@ -48,7 +49,7 @@ fn main() -> anyhow::Result<()> {
         let (client, connection) = config.connect(api::NoTls).await?;
         let mut postgres = pin!(runtime.spawn(connection));
 
-        let app = api::App::new(client.into(), bot_token, pub_key);
+        let app = api::App::new(client.into(), app_id, bot_token, pub_key);
         let state = std::sync::Arc::new(app);
 
         let mut http = hyper::server::conn::Http::new();

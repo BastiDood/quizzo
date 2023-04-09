@@ -8,6 +8,7 @@ This bot is powered by the [Twilight library](https://github.com/twilight-rs/twi
 ------------- | ----------------------------------------------------------------------------------------- | :-------: | ------:
 `PORT`        | Network port to bind to when launching the bot.                                           | &#x2714   |
 `PUB_KEY`     | Hex-encoded cryptograhpic public key provided by the [Discord Developer Portal][discord]. | &#x2714   |
+`APP_ID`      | Application ID provided by the [Discord Developer Portal][discord].                       | &#x2714   |
 `BOT_TOKEN`   | Bot token provided by the [Discord Developer Portal][discord].                            | &#x2714   |
 `PG_PORT`     | Port at which the PostgreSQL instance is hosted.                                          | &#x274c   | `5432`
 `PG_HOSTNAME` | Hostname at which the PostgreSQL instance is hosted.                                      | &#x2714   |
@@ -27,6 +28,7 @@ deno run --allow-net --allow-env scripts/register-commands.ts
 
 # Start the bot!
 PORT=
+APP_ID=
 PUB_KEY=
 PG_PORT=5432
 cargo run --release
