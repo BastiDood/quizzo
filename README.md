@@ -21,10 +21,24 @@ This bot is powered by the [Twilight library](https://github.com/twilight-rs/twi
 Once these are available, one may use Rust's built-in package manager [Cargo](https://doc.rust-lang.org/cargo/) to launch the bot.
 
 ```bash
+# Initalize the `data/` folder for PostgreSQL
+deno task init
+
+# Start the PostgreSQL instance
+deno task db
+```
+
+```bash
+# Initialize the template database
+deno task template
+
+# Instantiate the template
+deno task create
+
 # Register the required commands
 BOT_TOKEN=
 GUILD_ID=
-deno run --allow-net --allow-env scripts/register-commands.ts
+deno task register
 
 # Start the bot!
 PORT=
