@@ -36,11 +36,11 @@ impl Bot {
         Self { client: twilight_http::Client::new(token), quizzes: Registry::new(), db }
     }
 
-    pub fn on_message(&self, interaction: Interaction) -> InteractionResponse {
+    pub async fn on_message(&self, interaction: Interaction) -> InteractionResponse {
         let result = match interaction.kind {
             InteractionType::Ping => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
-            InteractionType::ApplicationCommand => self.on_app_command(interaction),
-            InteractionType::MessageComponent => self.on_msg_component(interaction),
+            InteractionType::ApplicationCommand => self.on_app_command(interaction).await,
+            InteractionType::MessageComponent => self.on_msg_component(interaction).await,
             _ => Err(error::Error::UnsupportedInteraction),
         };
 
@@ -71,17 +71,17 @@ impl Bot {
         let User { id, .. } =
             interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
         let data = interaction.data.ok_or(error::Error::Fatal)?;
-        let InteractionData::ApplicationCommand(CommandData { name, options, .. }) = data else {
+        let InteractionData::ApplicationCommand(data) = data else {
             return Err(error::Error::Fatal);
         };
-
+        let CommandData { name, options, .. } = *data;
         match name.as_str() {
             "create" => self.on_create_command(id, &options).await,
             "list" => self.on_list_command(id).await,
             "add" => self.on_add_choice(id, &options).await,
             "remove" => self.on_remove_choice(id, &options).await,
-            "edit" => self.on_edit_command(id, &options),
-            "start" => self.on_start_command(id, &options),
+            "edit" => self.on_edit_command(id, &options).await,
+            "start" => self.on_start_command(id, &options).await,
             "help" => todo!(),
             _ => Err(error::Error::Fatal),
         }
@@ -121,7 +121,7 @@ impl Bot {
         use db::TryStreamExt;
         let fields: Vec<_> = self
             .db
-            .get_quizzes_by_user(uid)
+            .get_quizzes_by_user(uid.into_nonzero())
             .await
             .map_err(|_| error::Error::Fatal)?
             .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, .. } }| EmbedField {
@@ -129,6 +129,7 @@ impl Bot {
                 name: alloc::format!("**[{id}]:** {question}"),
                 value: alloc::format!("{expiration}-second timeout with {} choices.", choices.len()),
             })
+            .map_err(|_| error::Error::Fatal)
             .try_collect()
             .await?;
         Ok(InteractionResponse {
@@ -219,7 +220,6 @@ impl Bot {
         let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
         let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
         let index = u16::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
-        self.db.remove_choice(uid.into_nonzero(), qid, index);
         let Err(err) = self.db.remove_choice(uid.into_nonzero(), qid, index).await else {
             return Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
@@ -238,7 +238,7 @@ impl Bot {
         })
     }
 
-    fn on_edit_command(
+    async fn on_edit_command(
         &self,
         uid: Id<UserMarker>,
         options: &[CommandDataOption],
@@ -246,7 +246,7 @@ impl Bot {
         todo!()
     }
 
-    fn on_start_command(
+    async fn on_start_command(
         &self,
         uid: Id<UserMarker>,
         options: &[CommandDataOption],
@@ -254,7 +254,7 @@ impl Bot {
         todo!()
     }
 
-    fn on_msg_component(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
+    async fn on_msg_component(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
         todo!()
     }
 }

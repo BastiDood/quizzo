@@ -1,104 +1,68 @@
 #![no_std]
 extern crate alloc;
 
-mod auth;
-mod interaction;
-mod lobby;
-mod quiz;
-mod util;
+mod bot;
 
-use alloc::string::String;
-use auth::{
-    callback::{self, CodeExchanger},
-    login::{self, Redirect},
-};
-use db::Database;
+use alloc::{boxed::Box, string::String};
+use bot::Bot;
 use hyper::{Body, Request, Response, StatusCode};
-use lobby::Lobby;
-use parking_lot::Mutex;
-use rand_core::{CryptoRng, RngCore};
 use ring::signature::UnparsedPublicKey;
-use twilight_model::id::{marker::ApplicationMarker, Id};
 
-pub use db::{MongoClient, MongoDb, ObjectId};
-pub use hyper::Uri;
-pub type ApplicationId = Id<ApplicationMarker>;
+pub use db::{Client, Config, Database, NoTls};
 
-type HttpClient = hyper::Client<hyper_trust_dns::RustlsHttpsConnector>;
-
-pub struct App<Rng, Bytes>
-where
-    Bytes: AsRef<[u8]>,
-{
-    /// Random number generator for cryptographic nonces.
-    rng: Mutex<Rng>,
-    /// Handle to the database collections.
-    db: Database,
-    /// Controls for the lobby.
-    lobby: Lobby,
-    /// Redirects requests to the OAuth consent page.
-    redirector: Redirect,
-    /// Exchanges authorization codes for token responses.
-    exchanger: CodeExchanger,
-    /// HTTPS/1.0 client for token-related API calls.
-    http: HttpClient,
-    /// Public key of the Discord application.
-    public: UnparsedPublicKey<Bytes>,
+pub struct App {
+    /// Command handler.
+    bot: Bot,
+    /// Ed25519 public key.
+    public: UnparsedPublicKey<Box<[u8]>>,
 }
 
-impl<Rng, Bytes> App<Rng, Bytes>
-where
-    Rng: RngCore + CryptoRng,
-    Bytes: AsRef<[u8]>,
-{
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        rand: Rng,
-        db: &MongoDb,
-        bot_token: String,
-        app_id: ApplicationId,
-        pub_key: Bytes,
-        client_id: &str,
-        client_secret: &str,
-        redirect_uri: &[u8],
-    ) -> Self {
-        use ring::signature::ED25519;
-        let connector = hyper_trust_dns::TrustDnsResolver::default().into_rustls_native_https_connector();
-        let http = hyper::Client::builder().http1_max_buf_size(8192).set_host(false).build(connector);
-        Self {
-            http,
-            rng: Mutex::new(rand),
-            db: Database::new(db),
-            lobby: Lobby::new(bot_token, app_id),
-            exchanger: CodeExchanger::new(client_id, client_secret, redirect_uri),
-            redirector: Redirect::new(client_id, redirect_uri),
-            public: UnparsedPublicKey::new(&ED25519, pub_key),
-        }
+impl App {
+    pub fn new(db: Database, token: String, public: Box<[u8]>) -> Self {
+        Self { bot: Bot::new(db, token), public: UnparsedPublicKey::new(&ring::signature::ED25519, public) }
     }
 
     pub async fn try_respond(&self, req: Request<Body>) -> Result<Response<Body>, StatusCode> {
         use hyper::{http::request::Parts, Method};
-        let Self { rng, db, lobby, redirector, exchanger, http, public } = self;
-        let (Parts { uri, method, mut headers, .. }, body) = req.into_parts();
-        match method {
-            Method::GET => match uri.path() {
-                "/auth/login" => {
-                    let nonce = rng.lock().next_u64();
-                    login::try_respond(nonce, db, redirector).await
-                }
-                "/auth/callback" => {
-                    let query = uri.query().ok_or(StatusCode::BAD_REQUEST)?;
-                    callback::try_respond(&headers, query, exchanger, db, http).await
-                }
-                _ => Err(StatusCode::NOT_FOUND),
-            },
-            Method::POST => match uri.path() {
-                "/discord" => interaction::try_respond(body, &headers, public, db, lobby).await,
-                "/quiz" => quiz::try_respond(body, &mut headers, db).await,
-                _ => Err(StatusCode::NOT_FOUND),
-            },
-            Method::PUT | Method::DELETE | Method::PATCH => Err(StatusCode::METHOD_NOT_ALLOWED),
-            _ => Err(StatusCode::NOT_IMPLEMENTED),
+        let (Parts { uri, method, headers, .. }, body) = req.into_parts();
+
+        if method != Method::POST {
+            return Err(StatusCode::METHOD_NOT_ALLOWED);
         }
+
+        if uri.path() != "/discord" {
+            return Err(StatusCode::NOT_FOUND);
+        }
+
+        // Retrieve security headers
+        let maybe_sig = headers.get("X-Signature-Ed25519");
+        let maybe_time = headers.get("X-Signature-Timestamp");
+        let (sig, timestamp) = maybe_sig.zip(maybe_time).ok_or(StatusCode::UNAUTHORIZED)?;
+
+        let mut signature = [0; 64];
+        hex::decode_to_slice(sig, &mut signature).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+        // Append body after the timestamp
+        let payload = hyper::body::to_bytes(body).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let mut message = timestamp.as_bytes().to_vec();
+        message.extend_from_slice(&payload);
+
+        // Validate the challenge
+        self.public.verify(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
+        drop(message);
+        drop(signature);
+
+        // Parse incoming interaction
+        let interaction = serde_json::from_slice(&payload).map_err(|_| StatusCode::BAD_REQUEST)?;
+        drop(payload);
+
+        // Construct new body
+        let reply = self.bot.on_message(interaction).await;
+        let bytes = serde_json::to_vec(&reply).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        use hyper::header::{HeaderValue, CONTENT_TYPE};
+        let mut res = Response::new(Body::from(bytes));
+        assert!(res.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json")).is_none());
+        Ok(res)
     }
 }

@@ -5,10 +5,7 @@ edition = "2021"
 
 [dependencies]
 model = { path = "../model", package = "quizzo-model" }
-
-[dependencies.tokio-postgres]
-version = "0.7"
-features = ["with-uuid-1"]
+tokio-postgres = "0.7"
 
 [dependencies.futures-util]
 version = "0.3"
