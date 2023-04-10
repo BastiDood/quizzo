@@ -276,10 +276,6 @@ impl Bot {
             return Err(error::Error::Schema);
         };
 
-        if name != "edit" {
-            return Err(error::Error::Schema);
-        }
-
         let [
             CommandDataOption { name: qid_name, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: arg_name, value: arg },
@@ -287,7 +283,7 @@ impl Bot {
             return Err(error::Error::Schema);
         };
 
-        if qid_name.as_str() != "quiz" {
+        if qid_name.as_str() != "quiz" || name.as_str() != arg_name.as_str() {
             return Err(error::Error::Schema);
         }
 
@@ -446,7 +442,8 @@ impl Bot {
         let uid: NonZeroU64 = uid.parse().map_err(|_| error::Error::Schema)?;
         let qid: NonZeroI16 = qid.parse().map_err(|_| error::Error::Schema)?;
 
-        let choice = values.into_iter().next().ok_or(error::Error::Schema)?.parse().map_err(|_| error::Error::Schema)?;
+        let choice =
+            values.into_iter().next().ok_or(error::Error::Schema)?.parse().map_err(|_| error::Error::Schema)?;
         self.inner
             .quizzes
             .get(&(Id::from(uid), qid))
