@@ -13,7 +13,7 @@ use twilight_model::{
     channel::message::{
         component::{ComponentType, SelectMenu, SelectMenuOption},
         embed::{EmbedAuthor, EmbedField},
-        Component, Embed, MessageFlags,
+        AllowedMentions, Component, Embed, MentionType, MessageFlags,
     },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
@@ -400,7 +400,15 @@ impl Bot {
             let mentions: Vec<_> = users.into_iter().map(|user| format!("<@{user}>")).collect();
             let mentions = mentions.join(" ").into_boxed_str();
             let content = format!("The correct answer is: ||{correct}||. Congratulations to {mentions}!");
-            inner.client.interaction(app_id).create_followup(&token).content(&content).unwrap().await.unwrap();
+            inner
+                .client
+                .interaction(app_id)
+                .create_followup(&token)
+                .allowed_mentions(Some(&AllowedMentions { parse: vec![MentionType::Users], ..Default::default() }))
+                .content(&content)
+                .unwrap()
+                .await
+                .unwrap();
         });
 
         Ok(InteractionResponse {
