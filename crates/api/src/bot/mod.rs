@@ -11,7 +11,7 @@ use twilight_model::{
         Interaction, InteractionData, InteractionType,
     },
     channel::message::{
-        component::{ComponentType, SelectMenu, SelectMenuOption},
+        component::{ActionRow, ComponentType, SelectMenu, SelectMenuOption},
         embed::{EmbedAuthor, EmbedField},
         AllowedMentions, Component, Embed, MentionType, MessageFlags,
     },
@@ -421,23 +421,25 @@ impl Bot {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
                 content: Some(format!("**[Expires <t:{expires_at}:R>]:** {question}")),
-                components: Some(vec![Component::SelectMenu(SelectMenu {
-                    custom_id: iid.to_string(),
-                    min_values: Some(1),
-                    max_values: Some(1),
-                    disabled: false,
-                    placeholder: Some(String::from("Your Answer")),
-                    options: choices
-                        .into_iter()
-                        .enumerate()
-                        .map(|(id, choice)| SelectMenuOption {
-                            default: false,
-                            description: None,
-                            emoji: None,
-                            label: choice,
-                            value: id.to_string(),
-                        })
-                        .collect(),
+                components: Some(vec![Component::ActionRow(ActionRow {
+                    components: vec![Component::SelectMenu(SelectMenu {
+                        custom_id: iid.to_string(),
+                        min_values: Some(1),
+                        max_values: Some(1),
+                        disabled: false,
+                        placeholder: Some(String::from("Your Answer")),
+                        options: choices
+                            .into_iter()
+                            .enumerate()
+                            .map(|(id, choice)| SelectMenuOption {
+                                default: false,
+                                description: None,
+                                emoji: None,
+                                label: choice,
+                                value: id.to_string(),
+                            })
+                            .collect(),
+                    })],
                 })]),
                 ..Default::default()
             }),
