@@ -1,8 +1,8 @@
 mod error;
 
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::num::{NonZeroI16, NonZeroU64};
 use db::Database;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use twilight_model::{
     application::interaction::{
@@ -68,7 +68,6 @@ impl Bot {
         };
         log::error!("Interaction failed with `{err:?}`");
 
-        use alloc::string::ToString;
         InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
@@ -140,7 +139,7 @@ impl Bot {
         Ok(InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
-                content: Some(alloc::format!("New quiz added: `{qid}`.")),
+                content: Some(format!("New quiz added: `{qid}`.")),
                 flags: Some(MessageFlags::EPHEMERAL),
                 ..Default::default()
             }),
@@ -160,7 +159,7 @@ impl Bot {
                     .zip(1..)
                     .map(|(choice, id)| EmbedField {
                         inline: false,
-                        name: alloc::format!("Choice {id}"),
+                        name: format!("Choice {id}"),
                         value: choice,
                     })
                     .collect();
@@ -169,12 +168,12 @@ impl Bot {
                     kind: String::from("rich"),
                     color: Some(user.accent_color.unwrap_or(0x236EA5)),
                     title: Some(question),
-                    description: Some(alloc::format!("Quiz `{id}` is set to expire in {expiration} seconds.")),
+                    description: Some(format!("Quiz `{id}` is set to expire in {expiration} seconds.")),
                     author: Some(EmbedAuthor {
-                        name: alloc::format!("{}#{}", user.name, user.discriminator()),
+                        name: format!("{}#{}", user.name, user.discriminator()),
                         icon_url: user
                             .avatar
-                            .map(|hash| alloc::format!("https://cdn.discordapp.com/avatars/{}/{hash}.webp", user.id)),
+                            .map(|hash| format!("https://cdn.discordapp.com/avatars/{}/{hash}.webp", user.id)),
                         proxy_icon_url: None,
                         url: None,
                     }),
@@ -226,7 +225,7 @@ impl Bot {
             return Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
-                    content: Some(alloc::format!("Successfully added new choice to quiz **[{qid}]**.")),
+                    content: Some(format!("Successfully added new choice to quiz **[{qid}]**.")),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }),
@@ -260,7 +259,7 @@ impl Bot {
             Ok(choice) => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
-                    content: Some(alloc::format!("Successfully removed choice ||{choice}|| from quiz **[{qid}]**. The answer has also been reset.")),
+                    content: Some(format!("Successfully removed choice ||{choice}|| from quiz **[{qid}]**. The answer has also been reset.")),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }),
@@ -311,7 +310,7 @@ impl Bot {
             return Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
-                    content: Some(alloc::format!("The {arg_name} property has been edited.")),
+                    content: Some(format!("The {arg_name} property has been edited.")),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }),
@@ -365,7 +364,7 @@ impl Bot {
         let inner = self.inner.clone();
         let correct = choices[usize::try_from(answer).unwrap()].clone();
         tokio::spawn(async move {
-            let mut users = alloc::collections::BTreeSet::new();
+            let mut users = std::collections::BTreeSet::new();
             let mut sleep = core::pin::pin!(tokio::time::sleep(duration));
             loop {
                 let Event { user, choice } = tokio::select! {
@@ -383,19 +382,18 @@ impl Bot {
             drop(rx);
             inner.quizzes.remove(&key);
 
-            let mentions: Vec<_> = users.into_iter().map(|user| alloc::format!("<@{user}>")).collect();
+            let mentions: Vec<_> = users.into_iter().map(|user| format!("<@{user}>")).collect();
             let mentions = mentions.join(" ").into_boxed_str();
-            let content = alloc::format!("The correct answer is: ||{correct}||. Congratulations to {mentions}!");
+            let content = format!("The correct answer is: ||{correct}||. Congratulations to {mentions}!");
             inner.client.interaction(app_id).create_followup(&token).content(&content).unwrap().await.unwrap();
         });
 
-        use alloc::string::ToString;
         Ok(InteractionResponse {
             kind: InteractionResponseType::DeferredUpdateMessage,
             data: Some(InteractionResponseData {
                 content: Some(question),
-                components: Some(alloc::vec![Component::SelectMenu(SelectMenu {
-                    custom_id: alloc::format!("{uid}:{qid}"),
+                components: Some(vec![Component::SelectMenu(SelectMenu {
+                    custom_id: format!("{uid}:{qid}"),
                     min_values: Some(1),
                     max_values: Some(1),
                     disabled: false,

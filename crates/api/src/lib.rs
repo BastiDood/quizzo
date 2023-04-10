@@ -1,9 +1,5 @@
-#![no_std]
-extern crate alloc;
-
 mod bot;
 
-use alloc::{boxed::Box, string::String};
 use bot::Bot;
 use core::num::NonZeroU64;
 use hyper::{Body, Request, Response, StatusCode};
