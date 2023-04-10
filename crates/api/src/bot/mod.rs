@@ -292,10 +292,15 @@ impl Bot {
         let uid = uid.into_nonzero();
         let qid = i16::try_from(*qid).map_err(|_| error::Error::Fatal)?;
         let qid = NonZeroI16::new(qid).ok_or(error::Error::Fatal)?;
+
         let result = match (arg_name.as_str(), arg) {
             ("question", CommandOptionValue::String(question)) => {
                 let q = question.as_str();
                 self.db.set_question(uid, qid, q).await
+            }
+            ("answer", CommandOptionValue::Integer(index)) => {
+                let idx = u16::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
+                self.db.set_answer(uid, qid, idx).await
             }
             ("expiration", CommandOptionValue::Integer(expiration)) => {
                 let exp = u16::try_from(*expiration).map_err(|_| error::Error::InvalidParams)?;
