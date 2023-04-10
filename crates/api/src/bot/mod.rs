@@ -59,19 +59,20 @@ impl Bot {
             InteractionType::Ping => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
             InteractionType::ApplicationCommand => self.on_app_command(interaction).await,
             InteractionType::MessageComponent => self.on_msg_component(interaction).await,
-            _ => Err(error::Error::Fatal),
+            _ => Err(error::Error::Schema),
         };
+
+        let err = match result {
+            Ok(res) => return res,
+            Err(err) => err,
+        };
+        log::error!("Interaction failed with \"{err:?}\"");
 
         use alloc::string::ToString;
-        let text = match result {
-            Ok(res) => return res,
-            Err(err) => err.to_string(),
-        };
-
         InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
-                content: Some(text),
+                content: Some(err.to_string()),
                 flags: Some(MessageFlags::EPHEMERAL),
                 tts: None,
                 allowed_mentions: None,
@@ -87,10 +88,10 @@ impl Bot {
 
     async fn on_app_command(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
         let user =
-            interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
-        let data = interaction.data.ok_or(error::Error::Fatal)?;
+            interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::Schema)?;
+        let data = interaction.data.ok_or(error::Error::Schema)?;
         let InteractionData::ApplicationCommand(data) = data else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         let token = interaction.token.into_boxed_str();
@@ -111,7 +112,7 @@ impl Bot {
                     ..Default::default()
                 }),
             }),
-            _ => Err(error::Error::Fatal),
+            _ => Err(error::Error::Schema),
         }
     }
 
@@ -120,19 +121,19 @@ impl Bot {
         uid: Id<UserMarker>,
         options: &[CommandDataOption],
     ) -> error::Result<InteractionResponse> {
-        let option = options.first().ok_or(error::Error::Fatal)?;
+        let option = options.first().ok_or(error::Error::Schema)?;
         let CommandDataOption { name, value: CommandOptionValue::String(value) } = option else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         if name.as_str() != "question" {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
         let qid = match self.db.init_quiz(uid.into_nonzero(), value.as_str()).await {
             Ok(id) => id,
             Err(db::error::Error::BadInput) => return Err(error::Error::BadInput),
-            _ => return Err(error::Error::Fatal),
+            _ => return Err(error::Error::Database),
         };
 
         Ok(InteractionResponse {
@@ -151,7 +152,7 @@ impl Bot {
             .db
             .get_quizzes_by_user(user.id.into_nonzero())
             .await
-            .map_err(|_| error::Error::Fatal)?
+            .map_err(|_| error::Error::Database)?
             .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, .. } }| {
                 let fields = choices
                     .into_iter()
@@ -185,7 +186,7 @@ impl Bot {
                     video: None,
                 }
             })
-            .map_err(|_| error::Error::Fatal)
+            .map_err(|_| error::Error::Database)
             .try_collect()
             .await?;
         Ok(InteractionResponse {
@@ -211,15 +212,15 @@ impl Bot {
             CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: choice_arg, value: CommandOptionValue::String(choice) },
         ] = options else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         if qid_arg.as_str() != "quiz" || choice_arg.as_str() != "choice" {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
-        let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
-        let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::Schema)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::Schema)?;
         let Err(err) = self.db.add_choice(uid.into_nonzero(), qid, choice.as_str()).await else {
             return Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
@@ -233,9 +234,9 @@ impl Bot {
 
         use db::error::Error as DbError;
         Err(match err {
-            DbError::NotFound => error::Error::UnknownQuiz,
+            DbError::NotFound => error::Error::NotFound,
             DbError::BadInput | DbError::TooMany => error::Error::BadInput,
-            DbError::Fatal => error::Error::Fatal,
+            DbError::Fatal => error::Error::Database,
         })
     }
 
@@ -244,16 +245,16 @@ impl Bot {
             CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: index_arg, value: CommandOptionValue::Integer(index) },
         ] = options else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         if qid_arg.as_str() != "quiz" || index_arg.as_str() != "index" {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
-        let qid = i16::try_from(*qid).map_err(|_| error::Error::Fatal)?;
-        let qid = NonZeroI16::new(qid).ok_or(error::Error::Fatal)?;
-        let index = u32::try_from(*index).map_err(|_| error::Error::Fatal)?;
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::Schema)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::Schema)?;
+        let index = u32::try_from(*index).map_err(|_| error::Error::Schema)?;
         match self.db.remove_choice(uid.into_nonzero(), qid, index).await {
             Ok(choice) => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
@@ -263,35 +264,35 @@ impl Bot {
                     ..Default::default()
                 }),
             }),
-            Err(db::error::Error::NotFound) => Err(error::Error::UnknownQuiz),
-            _ => Err(error::Error::Fatal),
+            Err(db::error::Error::NotFound) => Err(error::Error::NotFound),
+            _ => Err(error::Error::Database),
         }
     }
 
     async fn on_edit_command(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
-        let data = options.first().ok_or(error::Error::Fatal)?;
+        let data = options.first().ok_or(error::Error::Schema)?;
         let CommandDataOption { name, value: CommandOptionValue::SubCommand(args) } = data else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         if name != "edit" {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
         let [
             CommandDataOption { name: qid_name, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: arg_name, value: arg },
         ] = args.as_slice() else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         if qid_name.as_str() != "quiz" {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
         let uid = uid.into_nonzero();
-        let qid = i16::try_from(*qid).map_err(|_| error::Error::Fatal)?;
-        let qid = NonZeroI16::new(qid).ok_or(error::Error::Fatal)?;
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::Schema)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::Schema)?;
 
         let result = match (arg_name.as_str(), arg) {
             ("question", CommandOptionValue::String(question)) => {
@@ -299,14 +300,14 @@ impl Bot {
                 self.db.set_question(uid, qid, q).await
             }
             ("answer", CommandOptionValue::Integer(index)) => {
-                let idx = u16::try_from(*index).map_err(|_| error::Error::Fatal)?;
+                let idx = u16::try_from(*index).map_err(|_| error::Error::Schema)?;
                 self.db.set_answer(uid, qid, idx).await
             }
             ("expiration", CommandOptionValue::Integer(expiration)) => {
-                let exp = u16::try_from(*expiration).map_err(|_| error::Error::Fatal)?;
+                let exp = u16::try_from(*expiration).map_err(|_| error::Error::Schema)?;
                 self.db.set_expiration(uid, qid, exp).await
             }
-            _ => return Err(error::Error::Fatal),
+            _ => return Err(error::Error::Schema),
         };
 
         let Err(err) = result else {
@@ -322,9 +323,9 @@ impl Bot {
 
         use db::error::Error as DbError;
         Err(match err {
-            DbError::NotFound => error::Error::UnknownQuiz,
+            DbError::NotFound => error::Error::NotFound,
             DbError::BadInput => error::Error::BadInput,
-            _ => error::Error::Fatal,
+            _ => error::Error::Database,
         })
     }
 
@@ -334,32 +335,32 @@ impl Bot {
         options: &[CommandDataOption],
         token: Box<str>,
     ) -> error::Result<InteractionResponse> {
-        let option = options.first().ok_or(error::Error::Fatal)?;
+        let option = options.first().ok_or(error::Error::Schema)?;
         let CommandDataOption { name, value: CommandOptionValue::Integer(qid) } = option else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         if name != "start" {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
-        let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
-        let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::Schema)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::Schema)?;
         let db::RawQuiz { question, choices, answer, expiration } =
             match self.db.pop_quiz(uid.into_nonzero(), qid).await {
                 Ok(quiz) => quiz,
-                Err(db::error::Error::NotFound) => return Err(error::Error::UnknownQuiz),
-                _ => return Err(error::Error::Fatal),
+                Err(db::error::Error::NotFound) => return Err(error::Error::NotFound),
+                _ => return Err(error::Error::Database),
             };
         let Some(answer) = answer else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::BadInput);
         };
-        let expiration = u64::try_from(expiration).map_err(|_| error::Error::Fatal)?;
+        let expiration = u64::try_from(expiration).map_err(|_| error::Error::Database)?;
 
         let key = (uid, qid);
         let (tx, mut rx) = mpsc::unbounded_channel();
         if self.inner.quizzes.insert(key, tx).is_some() {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Dead);
         }
 
         let app_id = self.id;
@@ -421,34 +422,34 @@ impl Bot {
 
     async fn on_msg_component(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
         let User { id, .. } =
-            interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::UnknownUser)?;
-        let data = interaction.data.ok_or(error::Error::Fatal)?;
+            interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::Schema)?;
+        let data = interaction.data.ok_or(error::Error::Schema)?;
         let InteractionData::MessageComponent(MessageComponentInteractionData {
             component_type: ComponentType::SelectMenu,
             custom_id,
             values,
         }) = data else {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         };
 
         let mut iter = custom_id.splitn(2, ':');
         let first = iter.next();
         let second = iter.next();
         if iter.next().is_some() {
-            return Err(error::Error::Fatal);
+            return Err(error::Error::Schema);
         }
 
-        let (uid, qid) = first.zip(second).ok_or(error::Error::Fatal)?;
-        let uid: NonZeroU64 = uid.parse().map_err(|_| error::Error::Fatal)?;
-        let qid: NonZeroI16 = qid.parse().map_err(|_| error::Error::Fatal)?;
+        let (uid, qid) = first.zip(second).ok_or(error::Error::Schema)?;
+        let uid: NonZeroU64 = uid.parse().map_err(|_| error::Error::Schema)?;
+        let qid: NonZeroI16 = qid.parse().map_err(|_| error::Error::Schema)?;
 
-        let choice = values.into_iter().next().ok_or(error::Error::Fatal)?.parse().map_err(|_| error::Error::Fatal)?;
+        let choice = values.into_iter().next().ok_or(error::Error::Schema)?.parse().map_err(|_| error::Error::Schema)?;
         self.inner
             .quizzes
             .get(&(Id::from(uid), qid))
-            .ok_or(error::Error::UnknownQuiz)?
+            .ok_or(error::Error::NotFound)?
             .send(Event { user: id, choice })
-            .map_err(|_| error::Error::UnknownQuiz)?;
+            .map_err(|_| error::Error::NotFound)?;
 
         Ok(InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
