@@ -43,7 +43,6 @@ fn main() -> anyhow::Result<()> {
         tokio::net::TcpListener::from_std(listener)?
     };
 
-    env_logger::init();
     runtime.block_on(async {
         use core::pin::pin;
         let (client, connection) = config.connect(api::NoTls).await?;

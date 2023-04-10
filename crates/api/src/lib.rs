@@ -29,18 +29,22 @@ impl App {
         let path = uri.path();
 
         if method == Method::GET && path == "/healthz" {
+            log::info!("Health check pinged");
             return Ok(Response::new(Body::empty()));
         }
 
         if method != Method::POST {
+            log::error!("Non-POST request received");
             return Err(StatusCode::METHOD_NOT_ALLOWED);
         }
 
         if path != "/discord" {
+            log::error!("Non-Discord POST request received");
             return Err(StatusCode::NOT_FOUND);
         }
 
         // Retrieve security headers
+        log::debug!("New Discord interaction received");
         let maybe_sig = headers.get("X-Signature-Ed25519");
         let maybe_time = headers.get("X-Signature-Timestamp");
         let (sig, timestamp) = maybe_sig.zip(maybe_time).ok_or(StatusCode::UNAUTHORIZED)?;
@@ -60,6 +64,7 @@ impl App {
         // Parse incoming interaction
         let interaction = serde_json::from_slice(&payload).map_err(|_| StatusCode::BAD_REQUEST)?;
         drop(payload);
+        log::info!("{interaction:?}");
 
         // Construct new body
         let reply = self.bot.on_message(interaction).await;
