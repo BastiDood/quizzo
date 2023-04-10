@@ -17,7 +17,7 @@ use twilight_model::{
     },
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
     id::{
-        marker::{ApplicationMarker, UserMarker},
+        marker::{ApplicationMarker, InteractionMarker, UserMarker},
         Id,
     },
     user::User,
@@ -25,6 +25,7 @@ use twilight_model::{
 
 type AppId = Id<ApplicationMarker>;
 type UserId = Id<UserMarker>;
+type InteractionId = Id<InteractionMarker>;
 
 struct Event {
     user: UserId,
@@ -32,7 +33,7 @@ struct Event {
 }
 
 type Channel = mpsc::UnboundedSender<Event>;
-type Registry = dashmap::DashMap<(UserId, NonZeroI16), Channel>;
+type Registry = dashmap::DashMap<InteractionId, Channel>;
 
 struct Inner {
     client: twilight_http::Client,
@@ -94,6 +95,7 @@ impl Bot {
         };
         log::info!("{data:?}");
 
+        let iid = interaction.id;
         let token = interaction.token.into_boxed_str();
         let CommandData { name, options, .. } = *data;
 
@@ -103,7 +105,7 @@ impl Bot {
             "add" => self.on_add_choice(user.id, &options).await,
             "remove" => self.on_remove_choice(user.id, &options).await,
             "edit" => self.on_edit_command(user.id, &options).await,
-            "start" => self.on_start_command(user.id, &options, token).await,
+            "start" => self.on_start_command(user.id, &options, iid, token).await,
             "help" => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
@@ -336,6 +338,7 @@ impl Bot {
         &self,
         uid: UserId,
         options: &[CommandDataOption],
+        iid: InteractionId,
         token: Box<str>,
     ) -> error::Result<InteractionResponse> {
         let option = options.first().ok_or(error::Error::Schema)?;
@@ -369,9 +372,8 @@ impl Bot {
             .map_err(|_| error::Error::Fatal)?
             .as_secs();
 
-        let key = (uid, qid);
         let (tx, mut rx) = mpsc::unbounded_channel();
-        if self.inner.quizzes.insert(key, tx).is_some() {
+        if self.inner.quizzes.insert(iid, tx).is_some() {
             return Err(error::Error::Fatal);
         }
 
@@ -395,7 +397,7 @@ impl Bot {
             }
 
             drop(rx);
-            inner.quizzes.remove(&key);
+            inner.quizzes.remove(&iid);
 
             let mentions: Vec<_> = users.into_iter().map(|user| format!("<@{user}>")).collect();
             let mentions = mentions.join(" ").into_boxed_str();
@@ -416,7 +418,7 @@ impl Bot {
             data: Some(InteractionResponseData {
                 content: Some(format!("**[Expires <t:{expires_at}:R>]:** {question}")),
                 components: Some(vec![Component::SelectMenu(SelectMenu {
-                    custom_id: format!("{uid}:{qid}"),
+                    custom_id: iid.to_string(),
                     min_values: Some(1),
                     max_values: Some(1),
                     disabled: false,
@@ -451,23 +453,13 @@ impl Bot {
         }) = data else {
             return Err(error::Error::Schema);
         };
-
-        let mut iter = custom_id.splitn(2, ':');
-        let first = iter.next();
-        let second = iter.next();
-        if iter.next().is_some() {
-            return Err(error::Error::Schema);
-        }
-
-        let (uid, qid) = first.zip(second).ok_or(error::Error::Schema)?;
-        let uid: NonZeroU64 = uid.parse().map_err(|_| error::Error::Schema)?;
-        let qid: NonZeroI16 = qid.parse().map_err(|_| error::Error::Schema)?;
-
         let choice =
             values.into_iter().next().ok_or(error::Error::Schema)?.parse().map_err(|_| error::Error::Schema)?;
+        let iid = custom_id.parse().map_err(|_| error::Error::Schema)?;
+
         self.inner
             .quizzes
-            .get(&(Id::from(uid), qid))
+            .get(&iid)
             .ok_or(error::Error::NotFound)?
             .send(Event { user: id, choice })
             .map_err(|_| error::Error::NotFound)?;
