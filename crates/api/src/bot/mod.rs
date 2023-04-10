@@ -157,11 +157,7 @@ impl Bot {
                 let fields = choices
                     .into_iter()
                     .zip(1..)
-                    .map(|(choice, id)| EmbedField {
-                        inline: false,
-                        name: format!("Choice {id}"),
-                        value: choice,
-                    })
+                    .map(|(choice, id)| EmbedField { inline: false, name: format!("Choice {id}"), value: choice })
                     .collect();
                 Embed {
                     fields,
@@ -351,16 +347,24 @@ impl Bot {
         let Some(answer) = answer else {
             return Err(error::Error::BadInput);
         };
+
+        use std::time::SystemTime;
         let expiration = u64::try_from(expiration).map_err(|_| error::Error::Database)?;
+        let duration = core::time::Duration::from_secs(expiration);
+        let expires_at = SystemTime::now()
+            .checked_add(duration)
+            .ok_or(error::Error::Fatal)?
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(|_| error::Error::Fatal)?
+            .as_secs();
 
         let key = (uid, qid);
         let (tx, mut rx) = mpsc::unbounded_channel();
         if self.inner.quizzes.insert(key, tx).is_some() {
-            return Err(error::Error::Dead);
+            return Err(error::Error::Fatal);
         }
 
         let app_id = self.id;
-        let duration = core::time::Duration::from_secs(expiration);
         let inner = self.inner.clone();
         let correct = choices[usize::try_from(answer).unwrap()].clone();
         tokio::spawn(async move {
@@ -391,7 +395,7 @@ impl Bot {
         Ok(InteractionResponse {
             kind: InteractionResponseType::DeferredUpdateMessage,
             data: Some(InteractionResponseData {
-                content: Some(question),
+                content: Some(format!("**[Expires <t:{expires_at}:R>]:** {question}")),
                 components: Some(vec![Component::SelectMenu(SelectMenu {
                     custom_id: format!("{uid}:{qid}"),
                     min_values: Some(1),

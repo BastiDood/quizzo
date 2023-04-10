@@ -6,7 +6,7 @@ pub enum Error {
     NotFound,
     Schema,
     Database,
-    Dead,
+    Fatal,
 }
 
 impl Display for Error {
@@ -16,7 +16,7 @@ impl Display for Error {
             Self::NotFound => "Resource not found.",
             Self::Schema => "Discord provided an unexpected interaction schema.",
             Self::Database => "We encountered an unexpected database error on our end.",
-            Self::Dead => "Oops! We encountered a logic error on our end. This is a bug.",
+            Self::Fatal => "Oops! We encountered a logic error on our end. This is a bug.",
         })
     }
 }
