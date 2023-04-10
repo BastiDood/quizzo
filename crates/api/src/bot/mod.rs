@@ -153,12 +153,23 @@ impl Bot {
             .get_quizzes_by_user(user.id.into_nonzero())
             .await
             .map_err(|_| error::Error::Database)?
-            .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, .. } }| {
-                let fields = choices
-                    .into_iter()
-                    .zip(1..)
-                    .map(|(choice, id)| EmbedField { inline: false, name: format!("Choice {id}"), value: choice })
-                    .collect();
+            .map_ok(|db::Quiz { id, raw: db::RawQuiz { question, expiration, choices, answer } }| {
+                let iter = choices.into_iter().zip(0..);
+                let fields = if let Some(answer) = answer {
+                    iter.map(|(choice, id)| EmbedField {
+                        inline: false,
+                        name: if id == answer { format!(":white_check_mark: {id}") } else { format!(":x: {id}") },
+                        value: choice,
+                    })
+                    .collect()
+                } else {
+                    iter.map(|(choice, id)| EmbedField {
+                        inline: false,
+                        name: format!(":white_check_mark: {id}"),
+                        value: choice,
+                    })
+                    .collect()
+                };
                 Embed {
                     fields,
                     kind: String::from("rich"),
