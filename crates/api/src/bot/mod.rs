@@ -399,9 +399,13 @@ impl Bot {
             drop(rx);
             inner.quizzes.remove(&iid);
 
-            let mentions: Vec<_> = users.into_iter().map(|user| format!("<@{user}>")).collect();
-            let mentions = mentions.join(" ").into_boxed_str();
-            let content = format!("The correct answer is: ||{correct}||. Congratulations to {mentions}!");
+            let winners: Vec<_> = users.into_iter().map(|user| format!("<@{user}>")).collect();
+            let content = if winners.is_empty() {
+                format!("The correct answer is: ||{correct}||. Nobody got it right...")
+            } else {
+                let mentions = winners.join(" ").into_boxed_str();
+                format!("The correct answer is: ||{correct}||. Congratulations to {mentions}!")
+            };
             inner
                 .client
                 .interaction(app_id)
