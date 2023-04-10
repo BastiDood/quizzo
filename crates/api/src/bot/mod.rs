@@ -404,7 +404,7 @@ impl Bot {
         });
 
         Ok(InteractionResponse {
-            kind: InteractionResponseType::DeferredUpdateMessage,
+            kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
                 content: Some(format!("**[Expires <t:{expires_at}:R>]:** {question}")),
                 components: Some(vec![Component::SelectMenu(SelectMenu {
