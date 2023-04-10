@@ -30,12 +30,12 @@ impl App {
         }
 
         if method != Method::POST {
-            log::error!("Non-POST request received");
+            log::error!("Unexpected `{method}` request received");
             return Err(StatusCode::METHOD_NOT_ALLOWED);
         }
 
         if path != "/discord" {
-            log::error!("Non-Discord POST request received");
+            log::error!("Unexpected `POST {path}` request received");
             return Err(StatusCode::NOT_FOUND);
         }
 
