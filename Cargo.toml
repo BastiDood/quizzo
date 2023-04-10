@@ -15,6 +15,7 @@ anyhow = "1"
 api = { path = "crates/api", package = "quizzo-api" }
 env_logger = { version = "0.10", default-features = false }
 hex = "0.4"
+log = "0.4"
 
 [dependencies.hyper]
 version = "0.14"

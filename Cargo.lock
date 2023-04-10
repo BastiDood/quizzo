@@ -720,6 +720,7 @@ dependencies = [
  "env_logger",
  "hex",
  "hyper",
+ "log",
  "quizzo-api",
  "tokio",
 ]
