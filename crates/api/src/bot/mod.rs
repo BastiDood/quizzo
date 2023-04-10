@@ -343,7 +343,7 @@ impl Bot {
             return Err(error::Error::Schema);
         };
 
-        if name != "start" {
+        if name != "quiz" {
             return Err(error::Error::Schema);
         }
 
