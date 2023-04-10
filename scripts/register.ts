@@ -42,6 +42,15 @@ const index = {
     max_value: 24,
 };
 
+const answer = {
+    type: 4,
+    name: 'answer',
+    description: 'Index of the correct answer.',
+    required: true,
+    min_value: 0,
+    max_value: 24,
+};
+
 const expiration = {
     type: 4,
     name: 'expiration',
@@ -91,6 +100,12 @@ const response = await fetch(endpoint, {
                     name: 'question',
                     description: 'Edit the question itself.',
                     options: [qid, question],
+                },
+                {
+                    type: 1,
+                    name: 'answer',
+                    description: 'Edit the correct answer of the quiz.',
+                    options: [qid, answer],
                 },
                 {
                     type: 1,
