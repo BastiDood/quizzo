@@ -59,7 +59,7 @@ impl Bot {
             InteractionType::Ping => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
             InteractionType::ApplicationCommand => self.on_app_command(interaction).await,
             InteractionType::MessageComponent => self.on_msg_component(interaction).await,
-            _ => Err(error::Error::UnsupportedInteraction),
+            _ => Err(error::Error::Fatal),
         };
 
         use alloc::string::ToString;
@@ -120,18 +120,18 @@ impl Bot {
         uid: Id<UserMarker>,
         options: &[CommandDataOption],
     ) -> error::Result<InteractionResponse> {
-        let option = options.first().ok_or(error::Error::InvalidParams)?;
+        let option = options.first().ok_or(error::Error::Fatal)?;
         let CommandDataOption { name, value: CommandOptionValue::String(value) } = option else {
-            return Err(error::Error::InvalidParams);
+            return Err(error::Error::Fatal);
         };
 
         if name.as_str() != "question" {
-            return Err(error::Error::UnknownCommandName);
+            return Err(error::Error::Fatal);
         }
 
         let qid = match self.db.init_quiz(uid.into_nonzero(), value.as_str()).await {
             Ok(id) => id,
-            Err(db::error::Error::BadInput) => return Err(error::Error::InvalidParams),
+            Err(db::error::Error::BadInput) => return Err(error::Error::BadInput),
             _ => return Err(error::Error::Fatal),
         };
 
@@ -211,11 +211,11 @@ impl Bot {
             CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: choice_arg, value: CommandOptionValue::String(choice) },
         ] = options else {
-            return Err(error::Error::InvalidParams);
+            return Err(error::Error::Fatal);
         };
 
         if qid_arg.as_str() != "quiz" || choice_arg.as_str() != "choice" {
-            return Err(error::Error::UnknownCommandName);
+            return Err(error::Error::Fatal);
         }
 
         let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
@@ -234,7 +234,7 @@ impl Bot {
         use db::error::Error as DbError;
         Err(match err {
             DbError::NotFound => error::Error::UnknownQuiz,
-            DbError::BadInput | DbError::TooMany => error::Error::InvalidParams,
+            DbError::BadInput | DbError::TooMany => error::Error::BadInput,
             DbError::Fatal => error::Error::Fatal,
         })
     }
@@ -244,16 +244,16 @@ impl Bot {
             CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: index_arg, value: CommandOptionValue::Integer(index) },
         ] = options else {
-            return Err(error::Error::InvalidParams);
+            return Err(error::Error::Fatal);
         };
 
         if qid_arg.as_str() != "quiz" || index_arg.as_str() != "index" {
-            return Err(error::Error::UnknownCommandName);
+            return Err(error::Error::Fatal);
         }
 
-        let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
-        let qid = NonZeroI16::new(qid).ok_or(error::Error::UnknownQuiz)?;
-        let index = u32::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
+        let qid = i16::try_from(*qid).map_err(|_| error::Error::Fatal)?;
+        let qid = NonZeroI16::new(qid).ok_or(error::Error::Fatal)?;
+        let index = u32::try_from(*index).map_err(|_| error::Error::Fatal)?;
         match self.db.remove_choice(uid.into_nonzero(), qid, index).await {
             Ok(choice) => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
@@ -275,14 +275,14 @@ impl Bot {
         };
 
         if name != "edit" {
-            return Err(error::Error::UnknownCommandName);
+            return Err(error::Error::Fatal);
         }
 
         let [
             CommandDataOption { name: qid_name, value: CommandOptionValue::Integer(qid) },
             CommandDataOption { name: arg_name, value: arg },
         ] = args.as_slice() else {
-            return Err(error::Error::InvalidParams);
+            return Err(error::Error::Fatal);
         };
 
         if qid_name.as_str() != "quiz" {
@@ -299,14 +299,14 @@ impl Bot {
                 self.db.set_question(uid, qid, q).await
             }
             ("answer", CommandOptionValue::Integer(index)) => {
-                let idx = u16::try_from(*index).map_err(|_| error::Error::InvalidParams)?;
+                let idx = u16::try_from(*index).map_err(|_| error::Error::Fatal)?;
                 self.db.set_answer(uid, qid, idx).await
             }
             ("expiration", CommandOptionValue::Integer(expiration)) => {
-                let exp = u16::try_from(*expiration).map_err(|_| error::Error::InvalidParams)?;
+                let exp = u16::try_from(*expiration).map_err(|_| error::Error::Fatal)?;
                 self.db.set_expiration(uid, qid, exp).await
             }
-            _ => return Err(error::Error::UnknownCommandName),
+            _ => return Err(error::Error::Fatal),
         };
 
         let Err(err) = result else {
@@ -323,7 +323,7 @@ impl Bot {
         use db::error::Error as DbError;
         Err(match err {
             DbError::NotFound => error::Error::UnknownQuiz,
-            DbError::BadInput => error::Error::InvalidParams,
+            DbError::BadInput => error::Error::BadInput,
             _ => error::Error::Fatal,
         })
     }
@@ -334,13 +334,13 @@ impl Bot {
         options: &[CommandDataOption],
         token: Box<str>,
     ) -> error::Result<InteractionResponse> {
-        let option = options.first().ok_or(error::Error::InvalidParams)?;
+        let option = options.first().ok_or(error::Error::Fatal)?;
         let CommandDataOption { name, value: CommandOptionValue::Integer(qid) } = option else {
-            return Err(error::Error::InvalidParams);
+            return Err(error::Error::Fatal);
         };
 
         if name != "start" {
-            return Err(error::Error::UnknownCommandName);
+            return Err(error::Error::Fatal);
         }
 
         let qid = i16::try_from(*qid).map_err(|_| error::Error::UnknownQuiz)?;
