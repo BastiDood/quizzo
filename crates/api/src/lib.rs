@@ -34,14 +34,14 @@ impl App {
                     log::error!("Unexpected `{method} {path}` request received");
                     return Err(StatusCode::NOT_FOUND);
                 }
-            }
+            },
             Method::POST => match path {
                 "/discord" => (),
                 _ => {
                     log::error!("Unexpected `POST {path}` request received");
                     return Err(StatusCode::NOT_FOUND);
                 }
-            }
+            },
             _ => {
                 log::error!("Unexpected `{method} {path}` request received");
                 return Err(StatusCode::METHOD_NOT_ALLOWED);
