@@ -64,7 +64,6 @@ impl App {
         // Parse incoming interaction
         let interaction = serde_json::from_slice(&payload).map_err(|_| StatusCode::BAD_REQUEST)?;
         drop(payload);
-        log::info!("{interaction:?}");
 
         // Construct new body
         let reply = self.bot.on_message(interaction).await;

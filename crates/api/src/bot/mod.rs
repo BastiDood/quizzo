@@ -66,7 +66,7 @@ impl Bot {
             Ok(res) => return res,
             Err(err) => err,
         };
-        log::error!("Interaction failed with \"{err:?}\"");
+        log::error!("Interaction failed with `{err:?}`");
 
         use alloc::string::ToString;
         InteractionResponse {
@@ -93,6 +93,7 @@ impl Bot {
         let InteractionData::ApplicationCommand(data) = data else {
             return Err(error::Error::Schema);
         };
+        log::info!("{data:?}");
 
         let token = interaction.token.into_boxed_str();
         let CommandData { name, options, .. } = *data;
@@ -424,6 +425,8 @@ impl Bot {
         let User { id, .. } =
             interaction.member.and_then(|member| member.user).xor(interaction.user).ok_or(error::Error::Schema)?;
         let data = interaction.data.ok_or(error::Error::Schema)?;
+        log::info!("{data:?}");
+
         let InteractionData::MessageComponent(MessageComponentInteractionData {
             component_type: ComponentType::SelectMenu,
             custom_id,
