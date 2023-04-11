@@ -59,33 +59,29 @@ impl Bot {
 
     pub async fn on_message(&self, interaction: Interaction) -> InteractionResponse {
         let result = match interaction.kind {
-            InteractionType::Ping => Ok(InteractionResponse { kind: InteractionResponseType::Pong, data: None }),
+            InteractionType::Ping => return InteractionResponse { kind: InteractionResponseType::Pong, data: None },
             InteractionType::ApplicationCommand => self.on_app_command(interaction).await,
             InteractionType::MessageComponent => self.on_msg_component(interaction).await,
             _ => Err(error::Error::Schema),
         };
-
-        let err = match result {
-            Ok(res) => return res,
-            Err(err) => err,
-        };
-        log::error!("Interaction failed with `{err:?}`");
-
-        InteractionResponse {
-            kind: InteractionResponseType::ChannelMessageWithSource,
-            data: Some(InteractionResponseData {
-                content: Some(err.to_string()),
-                flags: Some(MessageFlags::EPHEMERAL),
-                tts: None,
-                allowed_mentions: None,
-                components: None,
-                embeds: None,
-                attachments: None,
-                choices: None,
-                custom_id: None,
-                title: None,
-            }),
-        }
+        result.unwrap_or_else(|err| {
+            log::error!("Interaction failed with `{err:?}`");
+            InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    content: Some(err.to_string()),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    tts: None,
+                    allowed_mentions: None,
+                    components: None,
+                    embeds: None,
+                    attachments: None,
+                    choices: None,
+                    custom_id: None,
+                    title: None,
+                }),
+            }
+        })
     }
 
     async fn on_app_command(&self, interaction: Interaction) -> error::Result<InteractionResponse> {
