@@ -3,9 +3,9 @@
     "tasks": {
         "init": "initdb -D data -U postgres",
         "db": "postgres -D data",
-        "template": "psql -U postgres -f scripts/init.sql -1 template1",
+        "template": "psql -U postgres -f init.sql -1 template1",
         "create": "createdb -U postgres quizzo",
         "drop": "dropdb -U postgres quizzo",
-        "register": "deno run --allow-env --allow-net scripts/register.ts"
+        "register": "deno run --allow-env --allow-net register.ts"
     }
 }
