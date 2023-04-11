@@ -47,6 +47,8 @@ pub struct Bot {
 }
 
 impl Bot {
+    const BRAND_COLOR: u32 = 0x236EA5;
+
     pub fn new(db: Database, id: NonZeroU64, token: String) -> Self {
         Self {
             inner: Arc::new(Inner { client: twilight_http::Client::new(token), quizzes: Registry::new() }),
@@ -109,7 +111,67 @@ impl Bot {
             "help" => Ok(InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
-                    content: Some(String::from("Help command coming soon!")),
+                    embeds: Some(vec![Embed {
+                        color: Some(Self::BRAND_COLOR),
+                        title: Some(String::from("Quizzo!")),
+                        description: Some(String::from("A list of commands for Quizzo.")),
+                        fields: vec![
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/help`"),
+                                value: String::from("Summon the help page."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/list`"),
+                                value: String::from("Lists down your currently active (but not started) quizzes."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/create <question>`"),
+                                value: String::from("Creates a new quiz. Returns the generated quiz ID."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/add <qid> <choice>`"),
+                                value: String::from("Adds a new `<choice>` for quiz `<qid>`."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/remove <qid> <index>`"),
+                                value: String::from("Removes an existing choice by its `<index>` from quiz `<qid>`."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/edit question <qid> <question>`"),
+                                value: String::from("Sets a new question for quiz `<qid>`."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/edit expiration <qid> <expiration>`"),
+                                value: String::from("Sets a new expiration time for quiz `<qid>`."),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/edit answer <qid> <answer>`"),
+                                value: String::from("Sets the correct answer for quiz `<qid>`. Expects a zero-indexed"),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: String::from("`/start <qid>`"),
+                                value: String::from("Starts quiz `<qid>` in the current channel. The quiz is then removed from the list."),
+                            },
+                        ],
+                        kind: String::from("rich"),
+                        author: None,
+                        footer: None,
+                        image: None,
+                        provider: None,
+                        thumbnail: None,
+                        timestamp: None,
+                        url: None,
+                        video: None,
+                    }]),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }),
@@ -175,7 +237,7 @@ impl Bot {
                 Embed {
                     fields,
                     kind: String::from("rich"),
-                    color: Some(user.accent_color.unwrap_or(0x236EA5)),
+                    color: Some(user.accent_color.unwrap_or(Self::BRAND_COLOR)),
                     title: Some(question),
                     description: Some(format!("Quiz `{id}` is set to expire in {expiration} seconds.")),
                     author: Some(EmbedAuthor {
