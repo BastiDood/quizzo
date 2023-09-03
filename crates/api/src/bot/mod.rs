@@ -275,10 +275,9 @@ impl Bot {
     }
 
     async fn on_add_choice(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
-        let [
-            CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
-            CommandDataOption { name: choice_arg, value: CommandOptionValue::String(choice) },
-        ] = options else {
+        let [CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) }, CommandDataOption { name: choice_arg, value: CommandOptionValue::String(choice) }] =
+            options
+        else {
             return Err(error::Error::Schema);
         };
 
@@ -308,10 +307,9 @@ impl Bot {
     }
 
     async fn on_remove_choice(&self, uid: UserId, options: &[CommandDataOption]) -> error::Result<InteractionResponse> {
-        let [
-            CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) },
-            CommandDataOption { name: index_arg, value: CommandOptionValue::Integer(index) },
-        ] = options else {
+        let [CommandDataOption { name: qid_arg, value: CommandOptionValue::Integer(qid) }, CommandDataOption { name: index_arg, value: CommandOptionValue::Integer(index) }] =
+            options
+        else {
             return Err(error::Error::Schema);
         };
 
@@ -342,10 +340,9 @@ impl Bot {
             return Err(error::Error::Schema);
         };
 
-        let [
-            CommandDataOption { name: qid_name, value: CommandOptionValue::Integer(qid) },
-            CommandDataOption { name: arg_name, value: arg },
-        ] = args.as_slice() else {
+        let [CommandDataOption { name: qid_name, value: CommandOptionValue::Integer(qid) }, CommandDataOption { name: arg_name, value: arg }] =
+            args.as_slice()
+        else {
             return Err(error::Error::Schema);
         };
 
@@ -381,7 +378,7 @@ impl Bot {
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }),
-            })
+            });
         };
 
         use db::error::Error as DbError;
@@ -514,7 +511,8 @@ impl Bot {
             component_type: ComponentType::SelectMenu,
             custom_id,
             values,
-        }) = data else {
+        }) = data
+        else {
             return Err(error::Error::Schema);
         };
         let choice =
