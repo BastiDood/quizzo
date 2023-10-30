@@ -172,6 +172,33 @@ impl Bot {
                     ..Default::default()
                 }),
             }),
+            "about" => Ok(InteractionResponse {
+                kind: InteractionResponseType::ChannelMessageWithSource,
+                data: Some(InteractionResponseData {
+                    embeds: Some(vec![Embed {
+                        color: Some(Self::BRAND_COLOR),
+                        title: Some("About Quizzo!".into()),
+                        description: Some("Quizzo is an [open-source](https://github.com/BastiDood/quizzo) Discord bot written in [Rust](https://www.rust-lang.org/) for making simple, timed, multiple-choice quizzes.".into()),
+                        fields: Vec::new(),
+                        kind: "rich".into(),
+                        author: Some(EmbedAuthor {
+                            icon_url: Some("https://cdn.discordapp.com/avatars/374495340902088704/aa236a66d815d3d204b28806e6305064.png".into()),
+                            name: "Basti Ortiz (@bastidood)".into(),
+                            url: Some("https://bastidood.github.io/".into()),
+                            proxy_icon_url: None,
+                        }),
+                        footer: None,
+                        image: None,
+                        provider: None,
+                        thumbnail: None,
+                        timestamp: None,
+                        url: Some("https://github.com/BastiDood/quizzo".into()),
+                        video: None,
+                    }]),
+                    flags: Some(MessageFlags::EPHEMERAL),
+                    ..Default::default()
+                }),
+            }),
             _ => Err(error::Error::Schema),
         }
     }
