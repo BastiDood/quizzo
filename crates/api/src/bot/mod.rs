@@ -109,56 +109,61 @@ impl Bot {
                 data: Some(InteractionResponseData {
                     embeds: Some(vec![Embed {
                         color: Some(Self::BRAND_COLOR),
-                        title: Some(String::from("Quizzo!")),
-                        description: Some(String::from("A list of commands for Quizzo.")),
+                        title: Some("Quizzo!".into()),
+                        description: Some("A list of commands for Quizzo.".into()),
                         fields: vec![
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/help`"),
-                                value: String::from("Summon the help page."),
+                                name: "`/about`".into(),
+                                value: "Some information about the bot, its development, and the creator.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/list`"),
-                                value: String::from("Lists down your currently active (but not started) quizzes."),
+                                name: "`/help`".into(),
+                                value: "Summon the help page.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/create <question>`"),
-                                value: String::from("Creates a new quiz. Returns the generated quiz ID."),
+                                name: "`/list`".into(),
+                                value: "Lists down your currently active (but not started) quizzes.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/add <qid> <choice>`"),
-                                value: String::from("Adds a new `<choice>` for quiz `<qid>`."),
+                                name: "`/create <question>`".into(),
+                                value: "Creates a new quiz. Returns the generated quiz ID.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/remove <qid> <index>`"),
-                                value: String::from("Removes an existing choice by its `<index>` from quiz `<qid>`."),
+                                name: "`/add <qid> <choice>`".into(),
+                                value: "Adds a new `<choice>` for quiz `<qid>`.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/edit question <qid> <question>`"),
-                                value: String::from("Sets a new question for quiz `<qid>`."),
+                                name: "`/remove <qid> <index>`".into(),
+                                value: "Removes an existing choice by its `<index>` from quiz `<qid>`.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/edit expiration <qid> <expiration>`"),
-                                value: String::from("Sets a new expiration time for quiz `<qid>`."),
+                                name: "`/edit question <qid> <question>`".into(),
+                                value: "Sets a new question for quiz `<qid>`.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/edit answer <qid> <answer>`"),
-                                value: String::from("Sets the correct answer for quiz `<qid>`. Expects a zero-indexed"),
+                                name: "`/edit expiration <qid> <expiration>`".into(),
+                                value: "Sets a new expiration time for quiz `<qid>`.".into(),
                             },
                             EmbedField {
                                 inline: false,
-                                name: String::from("`/start <qid>`"),
-                                value: String::from("Starts quiz `<qid>` in the current channel. The quiz is then removed from the list."),
+                                name: "`/edit answer <qid> <answer>`".into(),
+                                value: "Sets the correct answer for quiz `<qid>`. Expects a zero-indexed".into(),
+                            },
+                            EmbedField {
+                                inline: false,
+                                name: "`/start <qid>`".into(),
+                                value: "Starts quiz `<qid>` in the current channel. The quiz is then removed from the list.".into(),
                             },
                         ],
-                        kind: String::from("rich"),
+                        kind: "rich".into(),
                         author: None,
                         footer: None,
                         image: None,
@@ -259,7 +264,7 @@ impl Bot {
                 };
                 Embed {
                     fields,
-                    kind: String::from("rich"),
+                    kind: "rich".into(),
                     color: Some(user.accent_color.unwrap_or(Self::BRAND_COLOR)),
                     title: Some(question),
                     description: Some(format!("Quiz `{id}` is set to expire in {expiration} seconds.")),
@@ -287,7 +292,7 @@ impl Bot {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(if embeds.is_empty() {
                 InteractionResponseData {
-                    content: Some(String::from("You currently have no quizzes registered.")),
+                    content: Some("You currently have no quizzes registered.".into()),
                     flags: Some(MessageFlags::EPHEMERAL),
                     ..Default::default()
                 }
@@ -509,7 +514,7 @@ impl Bot {
                         min_values: Some(1),
                         max_values: Some(1),
                         disabled: false,
-                        placeholder: Some(String::from("Your Answer")),
+                        placeholder: Some("Your Answer".into()),
                         options: choices
                             .into_iter()
                             .enumerate()
@@ -556,7 +561,7 @@ impl Bot {
         Ok(InteractionResponse {
             kind: InteractionResponseType::ChannelMessageWithSource,
             data: Some(InteractionResponseData {
-                content: Some(String::from("Your answer has been successfully recorded.")),
+                content: Some("Your answer has been successfully recorded.".into()),
                 flags: Some(MessageFlags::EPHEMERAL),
                 ..Default::default()
             }),
