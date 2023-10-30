@@ -119,6 +119,10 @@ const response = await fetch(endpoint, {
             name: 'help',
             description: 'Summon a help menu. Will be sent to you via a temporary message.',
         },
+        {
+            name: 'about',
+            description: 'Some information about the bot, its development, and the creator.',
+        },
     ]),
 });
 
