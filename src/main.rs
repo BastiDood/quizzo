@@ -1,34 +1,21 @@
 fn main() -> anyhow::Result<()> {
     env_logger::init();
-    log::info!("Starting up");
+    log::info!("starting up");
 
     // Retrieve the public key
-    use std::env::{var, VarError};
+    use std::env::var;
     let pub_key = var("PUB_KEY")?.into_bytes();
     let mut pub_bytes = [0; 32];
     hex::decode_to_slice(pub_key, &mut pub_bytes)?;
     let pub_key = api::VerifyingKey::from_bytes(&pub_bytes)?;
+    log::debug!("loaded public key");
 
     // Set up Postgres driver configuration
     let app_port = var("PORT")?.parse()?;
     let app_id = var("APP_ID")?.parse()?;
     let bot_token = var("BOT_TOKEN")?;
-    let config = {
-        let username = var("PG_USERNAME")?;
-        let password = var("PG_PASSWORD")?;
-        let hostname = var("PG_HOSTNAME")?;
-        let database = var("PG_DATABASE")?;
-        let db_port = match var("PG_PORT") {
-            Ok(port) => port.parse()?,
-            Err(VarError::NotPresent) => 5432,
-            Err(err) => return Err(anyhow::Error::new(err)),
-        };
-        let mut config = api::Config::new();
-        config.user(&username).password(&password).host(&hostname).port(db_port).dbname(&database);
-        config
-    };
+    let config = var("PG_URL")?.parse::<api::Config>()?;
 
-    // Set up TCP listener
     use std::net::{Ipv4Addr, TcpListener};
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, app_port))?;
     listener.set_nonblocking(true)?;
@@ -36,7 +23,6 @@ fn main() -> anyhow::Result<()> {
     let addr = listener.local_addr()?;
     log::info!("listening to {addr}");
 
-    // Set up runtime
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_io().enable_time().build()?;
     let tcp = {
         let _guard = runtime.enter();
@@ -87,6 +73,6 @@ fn main() -> anyhow::Result<()> {
         anyhow::Ok(())
     })?;
 
-    log::info!("Shutting down");
+    log::info!("shutting down");
     Ok(())
 }
