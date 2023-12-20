@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
                 Err(err) => err,
             };
             log::error!("{err}");
-            tokio::time::sleep(core::time::Duration::from_secs(1)).await;
+            tokio::time::sleep(core::time::Duration::from_millis(100)).await;
         };
 
         use core::pin::pin;
