@@ -7,20 +7,20 @@ use hyper::{
     body::{Bytes, Incoming},
     Request, Response, StatusCode,
 };
-use ring::signature::UnparsedPublicKey;
 
 pub use db::{Client, Config, Database, NoTls};
+pub use ed25519_dalek::VerifyingKey;
 
 pub struct App {
     /// Command handler.
     bot: Bot,
     /// Ed25519 public key.
-    public: UnparsedPublicKey<Box<[u8]>>,
+    public: VerifyingKey,
 }
 
 impl App {
-    pub fn new(db: Database, id: NonZeroU64, token: String, public: Box<[u8]>) -> Self {
-        Self { bot: Bot::new(db, id, token), public: UnparsedPublicKey::new(&ring::signature::ED25519, public) }
+    pub fn new(db: Database, id: NonZeroU64, token: String, public: VerifyingKey) -> Self {
+        Self { bot: Bot::new(db, id, token), public }
     }
 
     pub async fn try_respond(&self, req: Request<Incoming>) -> Result<Response<Full<Bytes>>, StatusCode> {
@@ -59,6 +59,7 @@ impl App {
         let (sig, timestamp) = signature.zip(timestamp).ok_or(StatusCode::UNAUTHORIZED)?;
         let mut signature = [0; 64];
         hex::decode_to_slice(sig, &mut signature).map_err(|_| StatusCode::BAD_REQUEST)?;
+        let signature = ed25519_dalek::Signature::from_bytes(&signature);
 
         // Append body after the timestamp
         use http_body_util::BodyExt;
@@ -79,7 +80,7 @@ impl App {
         log::debug!("Fully received payload body.");
 
         // Validate the challenge
-        self.public.verify(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
+        self.public.verify_strict(&message, &signature).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
         // Parse incoming interaction
         let payload = message.get(start..).ok_or(StatusCode::BAD_REQUEST)?;

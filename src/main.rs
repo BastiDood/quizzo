@@ -13,8 +13,10 @@ fn main() -> anyhow::Result<()> {
 
     // Retrieve the public key
     use std::env::{var, VarError};
-    let key = var("PUB_KEY")?;
-    let pub_key = hex::decode(key)?.into_boxed_slice();
+    let pub_key = var("PUB_KEY")?.into_bytes();
+    let mut pub_bytes = [0; 32];
+    hex::decode_to_slice(pub_key, &mut pub_bytes)?;
+    let pub_key = api::VerifyingKey::from_bytes(&pub_bytes)?;
 
     // Set up Postgres driver configuration
     let app_port = var("PORT")?.parse()?;
