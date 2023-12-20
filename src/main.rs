@@ -30,8 +30,17 @@ fn main() -> anyhow::Result<()> {
     };
 
     runtime.block_on(async {
+        let (client, connection) = loop {
+            // HACK: Railway Private Networking requires 100ms to set up.
+            let err = match config.connect(api::NoTls).await {
+                Ok(pair) => break pair,
+                Err(err) => err,
+            };
+            log::error!("{err}");
+            tokio::time::sleep(core::time::Duration::from_secs(1)).await;
+        };
+
         use core::pin::pin;
-        let (client, connection) = config.connect(api::NoTls).await?;
         let mut postgres = pin!(runtime.spawn(connection));
         log::info!("PostgreSQL driver connected");
 
