@@ -1,12 +1,3 @@
-use http_body_util::Full;
-use hyper::{body::Bytes, Response, StatusCode};
-
-fn resolve_error_code(code: StatusCode) -> Response<Full<Bytes>> {
-    let mut response = Response::default();
-    *response.status_mut() = code;
-    response
-}
-
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     log::info!("Starting up");
@@ -43,7 +34,7 @@ fn main() -> anyhow::Result<()> {
     listener.set_nonblocking(true)?;
 
     let addr = listener.local_addr()?;
-    log::info!("Listening to {addr}");
+    log::info!("listening to {addr}");
 
     // Set up runtime
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_io().enable_time().build()?;
@@ -69,8 +60,10 @@ fn main() -> anyhow::Result<()> {
                     let outer = state.clone();
                     let service = hyper::service::service_fn(move |req| {
                         let inner = outer.clone();
+                        let (hyper::http::request::Parts { method, uri, headers, .. }, body) = req.into_parts();
                         async move {
-                            let response = inner.try_respond(req).await.unwrap_or_else(resolve_error_code);
+                            let mut response = Default::default();
+                            inner.try_respond(&mut response, method, uri.path(), headers, body).await;
                             Ok::<_, core::convert::Infallible>(response)
                         }
                     });
@@ -79,7 +72,7 @@ fn main() -> anyhow::Result<()> {
                     continue;
                 }
                 stop_res = &mut stop => {
-                    log::info!("Stop signal received");
+                    log::info!("stop signal received");
                     stop_res?;
                     break;
                 },
@@ -91,7 +84,6 @@ fn main() -> anyhow::Result<()> {
                 else => continue,
             }
         }
-
         anyhow::Ok(())
     })?;
 

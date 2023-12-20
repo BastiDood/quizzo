@@ -15,7 +15,6 @@ anyhow = "1"
 api = { path = "crates/api", package = "quizzo-api" }
 env_logger = { version = "0.10", default-features = false }
 hex = "0.4"
-http-body-util = "0.1.0"
 hyper-util = { version = "0.1.1", features = ["tokio"] }
 log = "0.4"
 

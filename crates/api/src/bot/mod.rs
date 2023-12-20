@@ -65,7 +65,7 @@ impl Bot {
             _ => Err(error::Error::Schema),
         };
         result.unwrap_or_else(|err| {
-            log::error!("Interaction failed with `{err:?}`");
+            log::error!("interaction failed with `{err:?}`");
             InteractionResponse {
                 kind: InteractionResponseType::ChannelMessageWithSource,
                 data: Some(InteractionResponseData {
