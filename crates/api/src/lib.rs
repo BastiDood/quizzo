@@ -94,7 +94,7 @@ impl App {
             }
         }
 
-        log::debug!("fully received payload body.");
+        log::debug!("fully received payload body");
 
         // Validate the challenge
         let signature = ed25519_dalek::Signature::from_bytes(&buffer);
