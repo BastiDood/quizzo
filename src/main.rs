@@ -1,5 +1,5 @@
 use http_body_util::Full;
-use hyper::{Response, StatusCode, body::Bytes};
+use hyper::{body::Bytes, Response, StatusCode};
 
 fn resolve_error_code(code: StatusCode) -> Response<Full<Bytes>> {
     let mut response = Response::default();
