@@ -1,7 +1,8 @@
-use hyper::{Body, Response, StatusCode};
+use http_body_util::Full;
+use hyper::{Response, StatusCode, body::Bytes};
 
-fn resolve_error_code(code: StatusCode) -> Response<Body> {
-    let mut response = Response::new(Body::empty());
+fn resolve_error_code(code: StatusCode) -> Response<Full<Bytes>> {
+    let mut response = Response::default();
     *response.status_mut() = code;
     response
 }
@@ -58,9 +59,7 @@ fn main() -> anyhow::Result<()> {
         let app = api::App::new(client.into(), app_id, bot_token, pub_key);
         let state = std::sync::Arc::new(app);
 
-        let mut http = hyper::server::conn::Http::new();
-        http.http1_only(true);
-
+        let http = hyper::server::conn::http1::Builder::new();
         let mut stop = pin!(tokio::signal::ctrl_c());
         loop {
             tokio::select! {
@@ -73,7 +72,8 @@ fn main() -> anyhow::Result<()> {
                             Ok::<_, core::convert::Infallible>(response)
                         }
                     });
-                    runtime.spawn(http.serve_connection(stream, service));
+                    let io = hyper_util::rt::TokioIo::new(stream);
+                    runtime.spawn(http.serve_connection(io, service));
                     continue;
                 }
                 stop_res = &mut stop => {
