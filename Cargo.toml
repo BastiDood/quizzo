@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 api = { path = "crates/api", package = "quizzo-api" }
-env_logger = { version = "0.10", default-features = false }
+env_logger = { version = "0.11", default-features = false }
 hex = "0.4"
 hyper-util = { version = "0.1.1", features = ["tokio"] }
 log = "0.4"
